@@ -121,17 +121,16 @@
 </div>
 <!--Editor-->
 <div class="flex h-[calc(100%-55px)]">
-<!--Sidebar wrapper-->
+    <!--Sidebar wrapper-->
     <div class="flex gap-[10px]">
         <!-- Mini Bar -->
-        <div class="bg-white flex flex-col max-w-[90px] py-4 pb-[10px] h-full relative justify-between z-[99] shadow-md border-t border-gray-300">
+        <div x-data="{ activeTool: 'templates' }" class="bg-white flex flex-col max-w-[90px] py-4 pb-[10px] h-full relative justify-between z-[99] shadow-md border-t border-gray-300">
             <!-- Items -->
             <div class="flex flex-col overflow-y-auto scrollbar-hide">
                 <!-- Templates -->
                 <div
-                        x-data="{ active: true, type: 'templates' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'templates'; $dispatch('change-tool', { type: 'templates' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'templates' } }));"
+                        :class="activeTool === 'templates' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[21px] h-[21px] text-gray-800" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -143,9 +142,8 @@
 
                 <!-- Uploads -->
                 <div
-                        x-data="{ active: false, type: 'uploads' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'uploads'; $dispatch('change-tool', { type: 'uploads' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'uploads' } }));"
+                        :class="activeTool === 'uploads' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[21px] h-[21px] text-gray-800" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -157,9 +155,8 @@
 
                 <!-- Text -->
                 <div
-                        x-data="{ active: false, type: 'text' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'text'; $dispatch('change-tool', { type: 'text' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'text' } }));"
+                        :class="activeTool === 'text' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[18px] h-[18px] text-gray-800" viewBox="0 0 189.127 189.127" xmlns="http://www.w3.org/2000/svg">
@@ -171,9 +168,8 @@
 
                 <!-- Drawing -->
                 <div
-                        x-data="{ active: false, type: 'drawing' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'drawing'; $dispatch('change-tool', { type: 'drawing' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'drawing' } }));"
+                        :class="activeTool === 'drawing' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[21px] h-[21px] text-gray-800" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -186,9 +182,8 @@
 
                 <!-- Settings -->
                 <div
-                        x-data="{ active: false, type: 'settings' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'settings'; $dispatch('change-tool', { type: 'settings' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'settings' } }));"
+                        :class="activeTool === 'settings' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[21px] h-[21px] text-gray-800" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
@@ -203,9 +198,8 @@
 
                 <!-- Clip Arts -->
                 <div
-                        x-data="{ active: false, type: 'clip_arts' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'clip_arts'; $dispatch('change-tool', { type: 'clip_arts' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'clip_arts' } }));"
+                        :class="activeTool === 'clip_arts' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <img src="./images/icons/clip-art.svg" alt="Clip Art" class="w-[21px] h-[21px]">
@@ -214,9 +208,8 @@
                 </div>
                 <!-- Mask -->
                 <div
-                        x-data="{ active: false, type: 'mask' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'mask'; $dispatch('change-tool', { type: 'mask' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'mask' } }));"
+                        :class="activeTool === 'mask' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <img src="./images/icons/mask.svg" alt="Mask" class="w-[21px] h-[21px]">
@@ -229,9 +222,8 @@
             <div class="flex flex-col">
                 <!-- Layers -->
                 <div
-                        x-data="{ active: false, type: 'layers' }"
-                        @click="$dispatch('change-tool', { type: type }); active = true;"
-                        :class="active ? 'bg-gray-100' : ''"
+                        @click="activeTool = 'layers'; $dispatch('change-tool', { type: 'layers' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'layers' } }));"
+                        :class="activeTool === 'layers' ? 'bg-gray-100' : ''"
                         class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50">
                     <div class="mb-1">
                         <svg class="w-[21px] h-[21px] text-gray-800" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -259,7 +251,7 @@
                     <div class="text-center text-gray-700">No templates found!</div>
                 </div>
             </div>
-            <!-- Uploads Panel -->
+            <!-- UploadsPanel -->
             <div
                     x-data="uploadsPanel"
                     x-show="isActive"
@@ -1578,7 +1570,7 @@
 
                                 <!-- Size List -->
                                 <div class="max-h-60 overflow-y-auto p-1">
-                                    <template x-for="size in search ? filteredSizes : canvasSizes" :key="size.value">
+                                    <template x-for="size in search ? filteredSizes : canvasSizes" :key="size.key">
                                         <div
                                                 @click="selectSize(size); open = false"
                                                 class="p-2 hover:bg-gray-100 rounded cursor-pointer"
