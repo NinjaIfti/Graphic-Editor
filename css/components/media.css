@@ -1,0 +1,42 @@
+.media-component {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    height: 100%;
+}
+
+
+.media-component .items {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-column-gap: 10px;
+    row-gap: 10px;
+}
+
+.media-component[data-row="3"] .items {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.media-component .items .item {
+    border-radius: 5px;
+    overflow: hidden;
+    object-fit: cover;
+    cursor: pointer;
+    transition: 0.3s;
+    box-shadow: 3px 3px 0px 0px #ddd;
+    padding: 5px;
+    min-height: 95px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.media-component .items .item img {
+    width: 100%;
+    object-fit: cover;
+    height: 100%;
+}
+
+.media-component .items .item:hover {
+    transform: scale(1.04);
+}

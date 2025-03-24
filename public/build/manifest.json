@@ -1,0 +1,17 @@
+{
+  "css/app.css": {
+    "file": "assets/app-DWCyJpxe.css",
+    "src": "css/app.css",
+    "isEntry": true
+  },
+  "images/brush-background.jpg": {
+    "file": "assets/brush-background-DRX5_FOG.jpg",
+    "src": "images/brush-background.jpg"
+  },
+  "js/app.js": {
+    "file": "assets/app-Dabw6C2v.js",
+    "name": "app",
+    "src": "js/app.js",
+    "isEntry": true
+  }
+}

@@ -1,0 +1,271 @@
+@import "components/media.css";
+@import "components/sidebar.css";
+@import "components/options-bar.css";
+@import "components/color-picker.css";
+@import "components/switch.css";
+@import "components/properties.css";
+@import "components/context-menu.css";
+
+:root {
+    --light-gray: #ebebeb;
+    --content-color: #262626;
+}
+
+
+.editor-wraper {
+    display: flex;
+    height: calc(100% - 55px);
+}
+
+/* #region Canvas Area */
+
+
+.canvas-area {
+    width: calc(100% - 0px);
+    height: calc(100vh - 55px);
+    box-sizing: border-box;
+    padding: 47px 50px;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.canvas-container {
+    box-shadow: 0px 0px 10px 0px #ddddddba;
+    height: calc(100vh - 89px);
+}
+
+/* #endregion Canvas Area */
+
+/* #region Editor Range Slider */
+
+.editor-range-slider {
+    appearance: none;
+    background: var(--light);
+    height: 4px;
+    border-radius: 5px;
+    width: 100%;
+}
+
+.editor-range-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background-color: var(--btnColor);
+    border: 2px solid var(--white);
+    cursor: pointer;
+    border-radius: 100%;
+}
+
+.editor-range-slider::-webkit-slider-thumb:hover {
+    background-color: var(--btnHoverColor);
+}
+
+/* #endregion Editor Range Slider */
+
+/* #region Editor Dropdown */
+.editor-dropdown {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    position: relative;
+}
+
+.editor-dropdown .dropdown-toggle-item {
+    display: flex;
+    justify-content: space-between;
+    background: #f8f9fa;
+    padding: 8px;
+    align-items: center;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    box-shadow: 0px 2px 2px 0px #ebebeb;
+    border: 1px solid #dddddd;
+    color: #333;
+    cursor: pointer;
+    transition: 0.2s ease-in-out;
+
+}
+
+.editor-dropdown .dropdown-body {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    animation: menuforward .15s ease-out both;
+    box-shadow: 1px 1px 2px -1px #ddd;
+    visibility: hidden;
+    overflow: hidden;
+    position: absolute;
+    z-index: 99;
+    width: 100%;
+    top: 37px;
+    display: none;
+}
+
+
+.editor-dropdown .dropdown-body .search-input {
+    border-bottom: 1px solid #ddd;
+    padding: 5px 10px;
+    background: #f8f9fa;
+}
+
+
+.editor-dropdown .dropdown-body .search-input input {
+    color: #333;
+    font-size: 13px;
+    background: transparent;
+    border: navajowhite;
+    padding: 4px 3px;
+}
+
+.editor-dropdown .dropdown-body .menu {
+    width: 100%;
+    height: 15rem;
+    overflow: auto;
+}
+
+.editor-dropdown .menu .item {
+    padding: 10px 10px;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
+    color: #333;
+    font-weight: 400;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.editor-dropdown .menu .item.selected,
+.editor-dropdown .menu .item:hover {
+    background: #ddd;
+}
+
+
+
+.editor-dropdown.active .dropdown-toggle-item .arrow-icon {
+    transform: rotate(180deg);
+}
+
+.editor-dropdown.active .dropdown-body {
+    visibility: visible;
+    display: block;
+}
+
+@keyframes menuforward {
+    0% {
+        transform: translateY(0)
+    }
+
+    to {
+        transform: translateY(10px)
+    }
+}
+
+/* #endregion Editor Dropdown */
+
+/* #region Navbar */
+.editor-navbar {
+    background-color: #fff;
+    color: var(--content-color);
+    padding: 10px 24px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    position: relative;
+    z-index: 99;
+}
+
+.items {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.heading {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--content-color);
+}
+
+/* #endregion Navbar */
+
+/* #region Editor Small Input */
+.editor-small-inp::-webkit-outer-spin-button,
+.editor-small-inp::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.editor-small-inp {
+    width: 50px;
+    border-radius: 4px;
+    background: #eee;
+    padding: 8px;
+    font-size: 12px;
+    text-align: center;
+    font-weight: bold;
+    border: none;
+}
+
+/* #endregion Editor Small Input */
+
+/* #region Nav Tabs */
+.nav-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 35px;
+    border-bottom: none !important;
+}
+
+.nav-tabs .tab-items {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0px;
+}
+
+.nav-tabs .tab-items .tab-btn {
+    width: 77px;
+    height: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    background: white;
+}
+
+.nav-tabs .tab-items .tab-btn.active,
+.nav-tabs .tab-items .tab-btn:hover {
+    background: #eeeeee;
+}
+
+.nav-tabs .tab-items .tab-btn svg {
+    fill: var(--content-color);
+}
+
+.nav-tabs .tab-items .tab-btn:first-child {
+    border-right: 0px;
+}
+
+.nav-tabs .tab-items .tab-btn:last-child {
+    border-left: 0px;
+}
+
+.nav-tabs .tab-panels {
+    height: 100%;
+    width: 100%;
+}
+
+.nav-tabs .tab-panels .tab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.nav-tabs .tab-panels .tab-panel.active {
+    display: flex;
+}
+
+/* #endregion Nav Tabs */

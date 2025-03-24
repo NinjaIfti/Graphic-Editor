@@ -1,0 +1,103 @@
+.single-panel#layers .panel-body .layers-con {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+}
+
+.single-panel#layers .panel-body .layers-con+.more {
+    display: none;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .layer-content {
+    display: flex;
+    justify-content: space-between;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0px 2px 3px -1px #ddd;
+    border: 1px solid #ddd;
+    align-items: center;
+    height: fit-content;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .sub-layers .single-layer .action-btn {
+    display: none;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .sub-layers {
+    padding-left: 17px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    animation: layer .15s ease-out both;
+    display: none;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .sub-layers.active {
+    display: flex;
+}
+
+
+.single-panel#layers .panel-body .layers-con .single-layer:hover {
+    transform: scale(1.01);
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .left-side,
+.single-panel#layers .panel-body .layers-con .single-layer .right-side {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .sub-layers .layer-content .left-side {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .left-side .title {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .left-side img {
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .right-side .action-btn {
+    cursor: pointer;
+}
+
+
+.single-panel#layers .panel-body .layers-con .single-layer .right-side .action-btn[data-type="object-view"] .hide,
+.single-panel#layers .panel-body .layers-con .single-layer .right-side .action-btn[data-type="object-view"].active .view {
+    display: none;
+}
+
+.single-panel#layers .panel-body .layers-con:empty+.more,
+.single-panel#layers .panel-body .layers-con .single-layer .right-side .action-btn[data-type="object-view"].active .hide {
+    display: block;
+}
+
+.single-panel#layers .panel-body .layers-con .single-layer .right-side svg {
+    fill: #333 !important;
+}
+
+@keyframes layer {
+    0% {
+        transform: translateY(0)
+    }
+
+    to {
+        transform: translateY(2px);
+    }
+}

@@ -1,0 +1,59 @@
+.single-panel#text .pre-built-headings {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.single-panel#text .pre-built-headings .single-heading {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 7px;
+    font-weight: 700;
+    font-family: "Roboto", sans-serif;
+    cursor: pointer;
+    color: var(--content-color);
+}
+
+.single-panel#text .pre-built-headings .single-heading[data-type="full"] {
+    font-size: 25px;
+}
+
+.single-panel#text .pre-built-headings .single-heading[data-type="sub"] {
+    font-size: 16px;
+}
+
+.single-panel#text .pre-built-headings .single-heading[data-type="paragraph"] {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.text-modify-btns {
+    display: flex;
+    gap: 8px;
+}
+
+.text-modify-btns .btn:has(input[type="checkbox"]:checked) {
+    background-color: var(--blue);
+}
+
+.text-modify-btns .btn {
+    height: fit-content;
+}
+
+.text-modify-btns .clr-filled-corner .clr-field {
+    width: 20px;
+    height: 20px;
+}
+
+.text-modify-btns .clr-filed-corner .clr-field {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    padding-right: 3px;
+}
+
+.text-modify-btns .clr-filed-corner {
+    border-right: 1px solid #ddd;
+    padding-right: 8px;
+}

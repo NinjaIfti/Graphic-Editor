@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import './custom.css';
+
+/* Hide Alpine elements before Alpine.js initializes */
+[x-cloak] {
+    display: none !important;
+}
