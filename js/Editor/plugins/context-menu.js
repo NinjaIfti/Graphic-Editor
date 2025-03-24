@@ -1,147 +1,193 @@
-// Import fabric canvas and utility functions
+import $ from 'jquery';
 import { canvas } from '../app.js';
 import { toBoolean } from "../../Functions/functions.js";
 import { createObjectsGroup, unGroupObjects, activeObjPositionChange } from '../functions.js';
+// Context Menu
+let CtMenu = {
+    currentId: 0
+};
 
-// Initialize Alpine data for context menu functionality
-document.addEventListener('alpine:init', () => {
-  Alpine.data('contextMenu', () => ({
-    show: false,
-    posX: 0,
-    posY: 0,
-    isLocked: false,
-    isGrouped: false,
-    
-    init() {
-      // Initialize event listener for canvas right-click
-      document.querySelector('.canvas-container').addEventListener('contextmenu', (e) => {
-        // Get active object from Fabric.js canvas
-        const obj = canvas.getActiveObject();
-        
-        // Hide menu if no objects or no active object
-        if (!canvas._objects.length || !obj) {
-          this.hideMenu();
-          return false;
-        }
-        
-        e.preventDefault();
-        
-        // Set properties based on active object
-        const { type } = obj;
-        this.isGrouped = type === 'group';
-        this.isLocked = obj.lockMovementX === true;
-        
-        // Calculate menu position
-        this.setMenuPosition(e);
-        
-        // Show menu
-        this.show = true;
-      });
-      
-      // Global click to hide menu
-      window.addEventListener('click', (e) => {
-        // Don't hide if clicking on the menu itself
-        if (!e.target.closest('.context-menu')) {
-          this.hideMenu();
-        }
-      });
+// Set id to context menu 
+CtMenu.setId = (element) => {
+    $(element).attr("data-ct-menu-id", CtMenu.currentId);
+};
+
+// Hide Context menu
+CtMenu.hide = () => {
+    $(".contextmenu-target").removeClass("selected");
+    $(".context-menu").removeClass("active");
+}
+
+// Show Context menu
+const showContextMenu = (e) => {
+    let contextMenu = e.contextMenu,
+        target = e.target,
+        event = e.event;
+
+    let contextMenuCoords = {
+        "top": event.pageY + 10
     },
-    
-    // Set the position of the context menu based on screen boundaries
-    setMenuPosition(e) {
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-      const menuWidth = 200; // Approximate width of menu
-      const menuHeight = 300; // Approximate height of menu
-      
-      let left = e.pageX + 10;
-      let top = e.pageY + 10;
-      
-      // Handle right edge of screen
-      if ((left + menuWidth) >= windowWidth) {
-        this.posX = windowWidth - menuWidth - 10;
-      } else {
-        this.posX = left;
-      }
-      
-      // Handle bottom edge of screen
-      if ((top + menuHeight) > windowHeight) {
-        this.posY = windowHeight - menuHeight - 10;
-      } else {
-        this.posY = top;
-      }
-    },
-    
-    // Hide the context menu
-    hideMenu() {
-      this.show = false;
-      document.querySelectorAll('.contextmenu-target').forEach(el => {
-        el.classList.remove('selected');
-      });
-    },
-    
-    // Toggle lock/unlock on selected objects
-    toggleLock() {
-      this.isLocked = !this.isLocked;
-      const objects = canvas.getActiveObjects();
-      
-      if (!objects.length) return false;
-      
-      objects.forEach(obj => {
-        obj.set({
-          lockMovementY: this.isLocked,
-          lockMovementX: this.isLocked,
-          lockScalingX: this.isLocked,
-          lockScalingY: this.isLocked,
-        });
-      });
-      
-      canvas.renderAll();
-      this.hideMenu();
-    },
-    
-    // Toggle group/ungroup for selected objects
-    toggleGroup() {
-      if (!this.isGrouped) {
-        const result = createObjectsGroup();
-        if (result) this.isGrouped = true;
-      } else {
-        const result = unGroupObjects();
-        if (result) this.isGrouped = false;
-      }
-      
-      this.hideMenu();
-    },
-    
-    // Change position of active object (bring forward/send backward)
-    changeObjectPosition(type) {
-      activeObjPositionChange(type);
-      this.hideMenu();
-    },
-    
-    // Delete selected object
-    deleteObject() {
-      const activeObject = canvas.getActiveObject();
-      if (activeObject) {
-        canvas.remove(activeObject);
-        canvas.renderAll();
-        this.hideMenu();
-      }
+        windowWidth = window.innerWidth,
+        windowHeight = window.innerHeight,
+        left = event.pageX + 20,
+        top = event.pageY + 10,
+        contextMenuWidth = contextMenu.width(),
+        contextMenuHeight = contextMenu.height();
+
+    if ((left + contextMenuWidth) >= windowWidth) {
+        contextMenuCoords.right = (windowWidth - left) + 10;
+        contextMenuCoords.left = 'auto';
+    } else {
+        contextMenuCoords.left = event.pageX + 10;
+        contextMenuCoords.right = 'auto';
     }
-  }));
+    if ((top + contextMenuHeight) > windowHeight) {
+        contextMenuCoords.bottom = (windowHeight - top) + 10;
+        contextMenuCoords.top = 'auto';
+    } else {
+        contextMenuCoords.top = top;
+        contextMenuCoords.bottom = 'auto';
+    }
+    contextMenu.css(contextMenuCoords);
+    contextMenu.addClass("active");
+};
+
+// Check Target 
+function checkTarget(targets, target) {
+    target = $(target);
+    let valid = true;
+    targets.forEach((className) => {
+        if (target.hasClass(className) || target.parents("." + className).length > 0) valid = false;
+    });
+    return valid;
+}
+
+// Hide Context Menu
+$(window).on("click", function (e) {
+    let target = $(e.target);
+    let unValidTargets = ["context-menu"],
+        valid = true;
+
+    valid = checkTarget(unValidTargets, target);
+    if (valid)
+        CtMenu.hide();
 });
 
-// Export any functions that might need to be accessed from outside
-export const showContextMenu = (element) => {
-  const menuEl = document.querySelector(element);
-  if (menuEl && menuEl.__x) {
-    menuEl.__x.data.show = true;
-  }
-};
+// Init Context Menu
+$(".context-menu").each(function () {
+    CtMenu.currentId++;
 
-export const hideContextMenu = (element) => {
-  const menuEl = document.querySelector(element);
-  if (menuEl && menuEl.__x) {
-    menuEl.__x.data.hideMenu();
-  }
-};
+    if (!$(this).attr('data-target')) return false;
+
+    let target = $(this).attr("data-target"),
+        $context = $(this);
+
+    CtMenu.setId($context);
+    CtMenu.setId(target);
+
+    $(document).on("contextmenu", target, function (e) {
+
+        $(target).addClass("contextmenu-target");
+        if (e.shiftKey) return;
+        e.preventDefault();
+
+        // Call before
+        let callbefore = $context.dataVal("callbefore");
+        if (callbefore) {
+            // callbefore = fn._handle($context, e.originalEvent, 'callbefore');
+            // if (!callbefore) return false;
+        }
+
+        $context.css({
+            "top": e.pageY + 10,
+            "left": e.pageX + 10,
+        });
+
+        if ($(this).hasClass(".selected")) {
+            $(this).addClass("selected");
+
+            showContextMenu({
+                event: e,
+                contextMenu: $context,
+                target: $(this)
+            });
+        } else {
+
+            $(target).removeClass('selected');
+            $(this).addClass("selected");
+            showContextMenu({
+                event: e,
+                contextMenu: $context,
+                target: $(this)
+            });
+        }
+    });
+});
+
+// contextmenu (canvas on right click)
+$(document).on("contextmenu", '.canvas-container', function (e) {
+    let obj = canvas.getActiveObject()
+    // context menu option toggle hide & show
+    if (!canvas._objects.length) CtMenu.hide();
+    if (!obj) return false;
+
+    let { type } = obj,
+        $con = $('.context-menu'),
+        $group = $con.find('.ct-menu-opt[data-target="group"]'),
+        $lock = $con.find('.ct-menu-opt[data-target="object_lock"]')
+
+    // Group 
+    $group.dnone(!(type === 'activeSelection' || type === 'group'));
+    $group.attr("data-group", type == 'group');
+
+    // Lock/Unlock
+    $lock.attr("data-locked", obj.lockMovementX == true);
+});
+
+
+//#region Event Listeners
+
+// Group/Un Group
+$(document).on('click', ".context-menu .ct-menu-opt[data-target='group']", function () {
+    let $this = $(this),
+        grouped = toBoolean($this.dataVal("group"))
+
+    grouped = grouped == false ? true : false;
+    let res = grouped ? createObjectsGroup() : unGroupObjects();
+
+    if (!res) return false;
+    $this.attr('data-group', grouped.toString());
+});
+
+// Canvas Obj Layer Pos 
+$(document).on('click', ".context-menu .ct-menu-opt.obj-pos", function () {
+    let type = $(this).data('target');
+    activeObjPositionChange(type);
+    CtMenu.hide();
+});
+
+// Lock/Unlock
+$(document).on('click', ".context-menu .ct-menu-opt[data-target='object_lock']", function () {
+    let locked = toBoolean($(this).dataVal("locked")),
+        objects = canvas.getActiveObjects();
+    if (!objects.length) return false;
+    locked = locked == false ? true : false;
+
+    objects.forEach(obj => {
+        obj.set({
+            lockMovementY: locked,
+            lockMovementX: locked,
+            lockScalingX: locked,
+            lockScalingY: locked,
+        });
+    });
+
+    $(this).attr("data-locked", locked.toString());
+
+    canvas.renderAll();
+    // Context menu hide
+    CtMenu.hide();
+});
+
+//#endregion Event Listeners 
+
