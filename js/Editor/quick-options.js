@@ -1,48 +1,94 @@
-import $ from 'jquery';
+// js/Editor/quick-options.js
 import { canvas } from "./app.js";
-import { alignmentObject } from './plugins/alignment.js';
+import { alignmentObject } from "./plugins/alignment.js";
 
-const $con = $('.quick-options-bar'),
-    QUICK_OPTIONS = {
-        $delete: $con.find('.single-tool[data-type="delete"]'),
-        $alignment: $con.find(".alignment-btns"),
-        $crop: $con.find(".single-tool.crop-btn"),
-        // Delete
-        delete: function (toggle) {
-            if (toggle) this.$delete.removeAttr('disabled');
-            else this.$delete.attr('disabled', true);
-        },
-        // Alignment
-        alignment: function (toggle) {
-            if (toggle) this.$alignment.removeAttr('disabled');
-            else this.$alignment.attr('disabled', true);
-        },
-        // Crop
-        crop: function (toggle) {
-            if (toggle) this.$crop.removeAttr('disabled');
-            else this.$crop.attr('disabled', true);
-        }
-    }
+// Create an Alpine.js compatible structure for Quick Options
+const QUICK_OPTIONS = {
+  // These functions will be refactored to work with Alpine's state management
+  delete: function (toggle) {
+    // Will be handled through Alpine's x-bind:disabled
+    document.dispatchEvent(
+      new CustomEvent("quick-option-delete", {
+        detail: { enabled: toggle },
+      })
+    );
+  },
+  alignment: function (toggle) {
+    document.dispatchEvent(
+      new CustomEvent("quick-option-alignment", {
+        detail: { enabled: toggle },
+      })
+    );
+  },
+  crop: function (toggle) {
+    document.dispatchEvent(
+      new CustomEvent("quick-option-crop", {
+        detail: { enabled: toggle },
+      })
+    );
+  },
+};
 
-// Delete Object (Quick options bar)
-$(document).on("click", ".quick-options-bar .single-tool[data-type='delete']", function () {
-    let obj = canvas.getActiveObject(),
-        id = obj.id,
-        $layer = $(`.layers-con .single-layer[data-id="${id}"]`);
-    $layer.find('.action-btn[data-type="delete"]').trigger("click");
+// Define the Alpine component that will control quick options bar
+document.addEventListener("alpine:init", () => {
+  Alpine.data("quickOptionsBar", () => ({
+    hasSelection: false,
+    canCrop: false,
+    cropActive: false,
+
+    init() {
+      // Listen for canvas events that affect the quick options bar
+      document.addEventListener("update-quick-options", (e) => {
+        this.hasSelection = e.detail.hasSelection;
+        this.canCrop = e.detail.canCrop;
+      });
+
+      document.addEventListener("crop-active-change", (e) => {
+        this.cropActive = e.detail.active;
+      });
+    },
+
+    // Delete selected object
+    deleteSelected() {
+      let obj = canvas.getActiveObject();
+      if (!obj) return;
+
+      const id = obj.id;
+      // Dispatch event for layers panel to handle deletion
+      document.dispatchEvent(
+        new CustomEvent("delete-layer", {
+          detail: { id: id },
+        })
+      );
+    },
+
+    // Align objects in canvas
+    alignObjects(type) {
+      let obj = canvas.getActiveObject();
+      if (!obj) return false;
+
+      alignmentObject(type, obj);
+      obj.setCoords();
+      canvas.setActiveObject(obj);
+      canvas.renderAll();
+    },
+
+    // Crop functions - these will interact with crop.js plugin
+    startCrop() {
+      document.dispatchEvent(new CustomEvent("start-crop", {}));
+      this.cropActive = true;
+    },
+
+    applyCrop() {
+      document.dispatchEvent(new CustomEvent("apply-crop", {}));
+      this.cropActive = false;
+    },
+
+    resetCrop() {
+      document.dispatchEvent(new CustomEvent("reset-crop", {}));
+      this.cropActive = false;
+    },
+  }));
 });
 
-// Alignment in Canvas (Quick options bar)
-$(document).on("click", ".quick-options-bar .alignment-btns .single-tool", function () {
-    let obj = canvas.getActiveObject(),
-        type = $(this).dataVal('type');
-    if (!obj) return false;
-    alignmentObject(type, obj);
-    obj.setCoords();
-    canvas.setActiveObject(obj);
-    canvas.renderAll();
-});
-
-export {
-    QUICK_OPTIONS
-}
+export { QUICK_OPTIONS };

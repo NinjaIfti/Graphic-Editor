@@ -1,195 +1,197 @@
-import $ from 'jquery';
+// js/Editor/plugins/filters.js
 import { canvas } from "../app.js";
-import { filters } from 'fabric';
+import { filters } from "fabric";
 
-// Apply Filter Fn
-const applyFilter = (index, filter) => {
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    if (obj.type === 'image') {
-        obj.filters[index] = filter;
-        obj.applyFilters();
-        canvas.renderAll();
-    }
-}
+// Alpine component for image filters
+export default function uploadsPanel() {
+  return {
+    activeFilter: "", // Track the active filter
+    filters: {
+      brightness: 0,
+      contrast: 0,
+      blur: 0,
+      noise: 0,
+      saturation: 0,
+      hue: 0,
+      pixelate: 2,
+    },
+    selectedObject: null,
+    objectProperties: {},
 
-// Get Filter fn
-function getFilter(index) {
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    if (obj.type === 'image') return obj.filters[index];
-}
+    init() {
+      // Initialize component
+      // Listen for canvas selection changes
+      if (typeof canvas !== "undefined") {
+        canvas.on("selection:created", this.onObjectSelected.bind(this));
+        canvas.on("selection:updated", this.onObjectSelected.bind(this));
+        canvas.on("selection:cleared", this.onSelectionCleared.bind(this));
+      }
+    },
 
-// Apply Filter Value
-function applyFilterValue(index, prop, value) {
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    if (obj.type !== 'image') return false;
+    onObjectSelected() {
+      this.selectedObject = canvas.getActiveObject();
+      if (this.selectedObject && this.selectedObject.type === "image") {
+        // Initialize filter values from the object if they exist
+        this.updateFilterValuesFromObject();
+      }
+    },
 
-    if (obj.filters[index]) {
-        obj.filters[index][prop] = value;
-        obj.applyFilters();
-        canvas.renderAll();
-    }
-}
+    onSelectionCleared() {
+      this.selectedObject = null;
+    },
 
-// Reset All Filters
-function resetAllFilter() {
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    if (obj.type !== 'image') return;
-    obj.filters = [];
-    obj.applyFilters();
-    canvas.renderAll();
-}
+    updateFilterValuesFromObject() {
+      const obj = this.selectedObject;
+      if (!obj || obj.type !== "image") return;
 
-// Function to apply a specific filter
-function generateFilterPreview(type) {
-    let obj = canvas.getActiveObject();
-    if (!obj || obj.type !== 'image') return;
+      // Reset filter values to default
+      this.filters = {
+        brightness: 0,
+        contrast: 0,
+        blur: 0,
+        noise: 0,
+        saturation: 0,
+        hue: 0,
+        pixelate: 2,
+      };
 
-    let filter;
-    switch (type) {
-        case 'black_white':
-            filter = new filters.Grayscale();
-            break;
-        case 'brownie':
-            filter = new filters.Brownie();
-            break;
-        case 'grayscale':
-            filter = new filters.Grayscale();
-            break;
-        case 'invert':
-            filter = new filters.Invert();
-            break;
-        case 'sepia':
-            filter = new filters.Sepia();
-            break;
-        case 'kodachrome':
-            filter = new filters.Kodachrome();
-            break;
-        case 'technicolor':
-            filter = new filters.Technicolor();
-            break;
-        case 'polaroid':
-            filter = new filters.Polaroid();
-            break;
-        case 'sharpen':
-            filter = new filters.Convolute({
-                matrix: [
-                    0, -1, 0,
-                    -1, 5, -1,
-                    0, -1, 0
-                ]
+      // Update values based on active filters
+      if (obj.filters[5])
+        this.filters.brightness = obj.filters[5].brightness || 0;
+      if (obj.filters[6]) this.filters.contrast = obj.filters[6].contrast || 0;
+      if (obj.filters[7])
+        this.filters.saturation = obj.filters[7].saturation || 0;
+      if (obj.filters[9]) this.filters.noise = obj.filters[9].noise || 0;
+      if (obj.filters[10])
+        this.filters.pixelate = obj.filters[10].blocksize || 2;
+      if (obj.filters[11]) this.filters.blur = obj.filters[11].blur || 0;
+      if (obj.filters[21]) this.filters.hue = obj.filters[21].rotation || 0;
+    },
+
+    applyFilter(filterType, value) {
+      if (!this.selectedObject || this.selectedObject.type !== "image") return;
+
+      const obj = this.selectedObject;
+      let amountVal = null;
+
+      switch (filterType) {
+        case "brightness":
+          obj.filters[5] = new filters.Brightness({
+            brightness: parseFloat(value),
+          });
+          break;
+        case "contrast":
+          obj.filters[6] = new filters.Contrast({
+            contrast: parseFloat(value),
+          });
+          break;
+        case "saturation":
+          obj.filters[7] = new filters.Saturation({
+            saturation: parseFloat(value),
+          });
+          break;
+        case "noise":
+          amountVal = value == 0 ? false : true;
+          obj.filters[9] =
+            amountVal &&
+            new filters.Noise({
+              noise: parseInt(value, 10),
             });
-            break;
-        case 'emboss':
-            filter = new filters.Convolute({
-                matrix: [
-                    1, 1, 1,
-                    1, 0.7, -1,
-                    -1, -1, -1
-                ]
-            });
-            break;
-        case 'vintage':
-            filter = new filters.Vintage();
-            break;
+          break;
+        case "pixelate":
+          obj.filters[10] = new filters.Pixelate({
+            blocksize: parseInt(value, 10),
+          });
+          break;
+        case "blur":
+          obj.filters[11] = new filters.Blur({
+            value: parseFloat(value),
+          });
+          if (obj.filters[11]) obj.filters[11].blur = parseFloat(value);
+          break;
+        case "hue":
+          obj.filters[21] = new filters.HueRotation({
+            rotation: value,
+          });
+          break;
         default:
-            return;
-    }
+          break;
+      }
 
-    obj.filters = [filter]; // Apply single filter
-    obj.applyFilters();
-    canvas.renderAll();
-}
+      obj.applyFilters();
+      canvas.renderAll();
+    },
 
-// Filter Apply with amount
-function filterApplyOnImage(filterType, amount) {
-    let amountVal = null;
-    switch (filterType) {
-        case 'vibrance':
-            applyFilter(8, true && new filters.Vibrance({
-                vibrance: parseFloat(amount),
-            }));
-            break;
-        case 'saturation':
-            applyFilter(7, true && new filters.Saturation({
-                saturation: parseFloat(amount),
-            }));
-            break;
-        case 'hue':
-            applyFilter(21, true && new filters.HueRotation({
-                rotation: amount,
-            }));
-            break;
-        case 'brightness':
-            applyFilter(5, true && new filters.Brightness({
-                brightness: parseFloat(amount)
-            }));
-            break;
-        case 'contrast':
-            applyFilter(6, true && new filters.Contrast({
-                contrast: parseFloat(amount)
-            }));
-        case 'sharpen':
-            amountVal = (amount == 0) ? false : true;
-            applyFilter(12, amountVal && new filters.Convolute({
-                matrix: [0, -1, 0,
-                    -1, 5, -1,
-                    0, -1, 0
-                ]
-            }));
-            break;
-        case 'blur':
-            applyFilter(11, true && new filters.Blur({
-                value: parseFloat(amount)
-            }));
-            applyFilterValue(11, 'blur', parseFloat(amount, 10));
-            break;
-        case 'pixelate':
-            applyFilter(10, true && new filters.Pixelate({
-                blocksize: parseInt(amount, 10)
-            }));
-            applyFilterValue(10, 'blocksize', parseInt(amount, 10));
-            break;
-        case 'noise':
-            amountVal = (amount == 0) ? false : true;
-            applyFilter(9, amountVal && new filters.Noise({
-                noise: parseInt(amount, 10)
-            }));
-            break;
-        case 'emboss':
-            amountVal = (amount == 0) ? false : true;
-            applyFilter(13, amountVal && new filters.Convolute({
-                matrix: [1, 1, 1,
-                    1, 0.7, -1,
-                    -1, -1, -1
-                ]
-            }));
-            break;
+    applyPresetFilter(filterName) {
+      if (!this.selectedObject || this.selectedObject.type !== "image") return;
+
+      this.activeFilter = filterName;
+      const obj = this.selectedObject;
+      let filter;
+
+      switch (filterName) {
+        case "black_white":
+        case "grayscale":
+          filter = new filters.Grayscale();
+          break;
+        case "brownie":
+          filter = new filters.Brownie();
+          break;
+        case "invert":
+          filter = new filters.Invert();
+          break;
+        case "sepia":
+          filter = new filters.Sepia();
+          break;
+        case "kodachrome":
+          filter = new filters.Kodachrome();
+          break;
+        case "technicolor":
+          filter = new filters.Technicolor();
+          break;
+        case "polaroid":
+          filter = new filters.Polaroid();
+          break;
+        case "sharpen":
+          filter = new filters.Convolute({
+            matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0],
+          });
+          break;
+        case "emboss":
+          filter = new filters.Convolute({
+            matrix: [1, 1, 1, 1, 0.7, -1, -1, -1, -1],
+          });
+          break;
+        case "vintage":
+          filter = new filters.Vintage();
+          break;
         default:
-            break;
-    }
+          return;
+      }
+
+      obj.filters = [filter]; // Apply single filter
+      obj.applyFilters();
+      canvas.renderAll();
+    },
+
+    resetFilters() {
+      if (!this.selectedObject || this.selectedObject.type !== "image") return;
+
+      this.activeFilter = "";
+      this.selectedObject.filters = [];
+      this.selectedObject.applyFilters();
+      canvas.renderAll();
+
+      // Reset filter values
+      this.filters = {
+        brightness: 0,
+        contrast: 0,
+        blur: 0,
+        noise: 0,
+        saturation: 0,
+        hue: 0,
+        pixelate: 2,
+      };
+    },
+  };
 }
-
-//#region Event Listeners
-
-// Filter Apply sliders
-$(document).on('input change', ".image-filters .filter-inp", function () {
-    let sliderFilter = $(this).data("filter"),
-        amount = parseFloat($(this).val());
-    filterApplyOnImage(sliderFilter, amount);
-});
-
-// Filter Previews
-$(document).on("click", ".filter-previews .single-filter", function () {
-    let filter = $(this).dataVal("filter");
-    generateFilterPreview(filter);
-});
-
-// Filters Reset
-$(document).on('click', ".reset-filter-btn", function () {
-    resetAllFilter();
-});
-//#endregion Event Listeners 

@@ -1,46 +1,247 @@
-import { Canvas } from 'fabric';
-import $ from 'jquery';
-const CANVAS_OBJECT_DYNAMIC_KEYS = ['id', 'name', 'originalItem', 'lockMovementX', 'lockMovementY', 'isPositioningLine', 'name'];
+import { Canvas } from "fabric";
+
+// Constants
+const CANVAS_OBJECT_DYNAMIC_KEYS = [
+  "id",
+  "name",
+  "originalItem",
+  "lockMovementX",
+  "lockMovementY",
+  "isPositioningLine",
+  "name",
+];
 const plugins = {
-    CanvasGuides: true,
-    ContextMenu: true,
-    Crop: true,
-    CurveText: false,
-    Filters: false,
-    RotationAngle: true
-}
+  CanvasGuides: true,
+  ContextMenu: true,
+  Crop: true,
+  CurveText: false,
+  Filters: false,
+  RotationAngle: true,
+};
 
-// Canvas Initialize
-let canvas = new Canvas('image-editor', {
-    // controlsAboveOverlay: true,
-    preserveObjectStacking: true,
-    selectionKey: "ctrlKey",
-    selection: true,
-    // width: $('.canvas-area').width(),
-    // height: $('.canvas-area').height(),
-    width: $('.canvas-area').width(),
-    height: $('.canvas-area').height(),
-    backgroundColor: "#fff"
-});
-canvas.backgroundColor = "white";
-canvas.renderAll();
-// SVG Icons
+// SVG Icons object - can be used by Alpine components
 const SVG_ICONS = {
-    "times": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 352 512\"><path d=\"M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z\"/></svg>",
-    "pdf": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"12\" viewBox=\"0 0 384 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M181.9 256.1c-5-16-4.9-46.9-2-46.9 8.4 0 7.6 36.9 2 46.9zm-1.7 47.2c-7.7 20.2-17.3 43.3-28.4 62.7 18.3-7 39-17.2 62.9-21.9-12.7-9.6-24.9-23.4-34.5-40.8zM86.1 428.1c0 .8 13.2-5.4 34.9-40.2-6.7 6.3-29.1 24.5-34.9 40.2zM248 160h136v328c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V24C0 10.7 10.7 0 24 0h200v136c0 13.2 10.8 24 24 24zm-8 171.8c-20-12.2-33.3-29-42.7-53.8 4.5-18.5 11.6-46.6 6.2-64.2-4.7-29.4-42.4-26.5-47.8-6.8-5 18.3-.4 44.1 8.1 77-11.6 27.6-28.7 64.6-40.8 85.8-.1 0-.1 .1-.2 .1-27.1 13.9-73.6 44.5-54.5 68 5.6 6.9 16 10 21.5 10 17.9 0 35.7-18 61.1-61.8 25.8-8.5 54.1-19.1 79-23.2 21.7 11.8 47.1 19.5 64 19.5 29.2 0 31.2-32 19.7-43.4-13.9-13.6-54.3-9.7-73.6-7.2zM377 105L279 7c-4.5-4.5-10.6-7-17-7h-6v128h128v-6.1c0-6.3-2.5-12.4-7-16.9zm-74.1 255.3c4.1-2.7-2.5-11.9-42.8-9 37.1 15.8 42.8 9 42.8 9z\"/></svg>",
-    "file-alt": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"12\" viewBox=\"0 0 384 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-114.1v6.1H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 98c4.5 4.5 7 10.6 7 16.9z\"/></svg>",
-    "file-archive": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"12\" viewBox=\"0 0 384 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M377 105L279.1 7c-4.5-4.5-10.6-7-17-7H256v128h128v-6.1c0-6.3-2.5-12.4-7-16.9zM128.4 336c-17.9 0-32.4 12.1-32.4 27 0 15 14.6 27 32.5 27s32.4-12.1 32.4-27-14.6-27-32.5-27zM224 136V0h-63.6v32h-32V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zM95.9 32h32v32h-32zm32.3 384c-33.2 0-58-30.4-51.4-62.9L96.4 256v-32h32v-32h-32v-32h32v-32h-32V96h32V64h32v32h-32v32h32v32h-32v32h32v32h-32v32h22.1c5.7 0 10.7 4.1 11.8 9.7l17.3 87.7c6.4 32.4-18.4 62.6-51.4 62.6z\"/></svg>",
-    "file-video": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"12\" viewBox=\"0 0 384 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M384 121.9V128H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 97.9A24 24 0 0 1 384 121.9zM224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm96 144v112c0 21.4-25.9 32-41 17L224 353.9V392c0 13.3-10.7 24-24 24H88c-13.3 0-24-10.7-24-24V280c0-13.3 10.7-24 24-24h112c13.3 0 24 10.7 24 24v38.1l55-55c15-15 41-4.5 41 17z\"/></svg>",
-    "file": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"12\" viewBox=\"0 0 384 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm160-14.1v6.1H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 98c4.5 4.5 7 10.6 7 16.9z\"/></svg>",
-    "check": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#5f6368\"><path d=\"M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z\"/></svg>",
-    "folder": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"16\" viewBox=\"0 0 512 512\"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d=\"M464 128H272l-64-64H48C21.5 64 0 85.5 0 112v288c0 26.5 21.5 48 48 48h416c26.5 0 48-21.5 48-48V176c0-26.5-21.5-48-48-48z\"/></svg>",
-    "text": "<svg width='17' height='17' fill='#000' height=\"64px\" width=\"64px\" version=\"1.1\" id=\"Capa_1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 189.127 189.127\" xml:space=\"preserve\" fill=\"#262626\"><g id=\"SVGRepo_bgCarrier\" stroke-width=\"0\"></g><g id=\"SVGRepo_tracerCarrier\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></g><g id=\"SVGRepo_iconCarrier\"> <path style=\"fill:#262626;\" d=\"M177.688,0H11.438c-4.143,0-7.5,3.358-7.5,7.5v46.23c0,4.142,3.357,7.5,7.5,7.5s7.5-3.358,7.5-7.5V15 h68.125v159.127H62.688c-4.143,0-7.5,3.358-7.5,7.5s3.357,7.5,7.5,7.5h63.75c4.143,0,7.5-3.358,7.5-7.5s-3.357-7.5-7.5-7.5h-24.375 V15h68.125v38.73c0,4.142,3.357,7.5,7.5,7.5s7.5-3.358,7.5-7.5V7.5C185.188,3.358,181.831,0,177.688,0z\"></path> </g></svg>",
-    "trash-alt": "<svg width='17' height='17' fill='#000' fill=\"#5f6368\" xmlns=\"http://www.w3.org/2000/svg\" height=\"16\" width=\"14\" viewBox=\"0 0 448 512\"><path d=\"M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.7 23.7 0 0 0 -21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0 -16-16z\"/></svg>",
-    "lock": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#5f6368\"><path d=\"M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z\"/></svg>",
-    "drawing": "<svg width='17' height='17' fill='#000' width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M20.07 3.456a3.135 3.135 0 0 0-4.434 0L10.25 8.843a3.38 3.38 0 0 0-.884 1.55l-.845 3.292c-.205.8.522 1.527 1.322 1.323l3.278-.837a3.384 3.384 0 0 0 1.555-.886L20.07 7.89a3.135 3.135 0 0 0 0-4.434Zm-2.117 4.43 1.057-1.057a1.635 1.635 0 0 0-2.313-2.313l-1.056 1.057 2.312 2.312Zm-1.166 1.166-3.172 3.172c-.24.24-.539.41-.866.493l-2.602.665.67-2.616a1.88 1.88 0 0 1 .492-.862l3.165-3.164 2.313 2.312Z\"></path><path d=\"M5.144 15.022a.641.641 0 1 0 0 1.282h13.751a2.109 2.109 0 0 1 0 4.218H9.194a.75.75 0 0 1 0-1.5h9.701a.609.609 0 1 0 0-1.218H5.144a2.141 2.141 0 0 1 0-4.282h1.862v1.5H5.144Z\"></path></svg>",
-    "eye-open": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"20px\" viewBox=\"0 -960 960 960\" width=\"20px\" fill=\"#5f6368\"><path d=\"M480-312q70 0 119-49t49-119q0-70-49-119t-119-49q-70 0-119 49t-49 119q0 70 49 119t119 49Zm0-72q-40 0-68-28t-28-68q0-40 28-68t68-28q40 0 68 28t28 68q0 40-28 68t-68 28Zm0 192q-142.6 0-259.8-78.5Q103-349 48-480q55-131 172.2-209.5Q337.4-768 480-768q142.6 0 259.8 78.5Q857-611 912-480q-55 131-172.2 209.5Q622.6-192 480-192Zm0-288Zm0 216q112 0 207-58t146-158q-51-100-146-158t-207-58q-112 0-207 58T127-480q51 100 146 158t207 58Z\"/></svg>",
-    "eye-close": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" height=\"20px\" viewBox=\"0 -960 960 960\" width=\"20px\" fill=\"#5f6368\"><path d=\"m637-425-62-62q4-38-23-65.5T487-576l-62-62q13-5 27-7.5t28-2.5q70 0 119 49t49 119q0 14-2.5 28t-8.5 27Zm133 133-52-52q36-28 65.5-61.5T833-480q-49-101-144.5-158.5T480-696q-26 0-51 3t-49 10l-58-58q38-15 77.5-21t80.5-6q143 0 261.5 77.5T912-480q-22 57-58.5 103.5T770-292Zm-2 202L638-220q-38 14-77.5 21t-80.5 7q-143 0-261.5-77.5T48-480q22-57 58-104t84-85L90-769l51-51 678 679-51 51ZM241-617q-35 28-65 61.5T127-480q49 101 144.5 158.5T480-264q26 0 51-3.5t50-9.5l-45-45q-14 5-28 7.5t-28 2.5q-70 0-119-49t-49-119q0-14 3.5-28t6.5-28l-81-81Zm287 89Zm-96 96Z\"/></svg>",
-    "layers": "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\"><path d=\"m19.474 12.838 1.697.835a1 1 0 0 1 0 1.795L13.32 19.33a3 3 0 0 1-2.649 0L2.82 15.468a1 1 0 0 1 0-1.795l1.697-.835 1.698.836-1.821.896 6.94 3.415a1.5 1.5 0 0 0 1.324 0l6.94-3.415-1.822-.896 1.7-.836ZM13.32 4.673l7.852 3.864a1 1 0 0 1 0 1.794l-7.852 3.864a3 3 0 0 1-2.649 0L2.82 10.33a1 1 0 0 1 0-1.794l7.851-3.864a3 3 0 0 1 2.65 0Zm-1.986 8.176a1.5 1.5 0 0 0 1.324 0l6.94-3.415-6.94-3.415a1.5 1.5 0 0 0-1.324 0l-6.94 3.415 6.94 3.415Z\"></path></svg>"
-}
+  times:
+    "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 352 512\"><path d=\"M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z\"/></svg>",
+  pdf: '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M181.9 256.1c-5-16-4.9-46.9-2-46.9 8.4 0 7.6 36.9 2 46.9zm-1.7 47.2c-7.7 20.2-17.3 43.3-28.4 62.7 18.3-7 39-17.2 62.9-21.9-12.7-9.6-24.9-23.4-34.5-40.8zM86.1 428.1c0 .8 13.2-5.4 34.9-40.2-6.7 6.3-29.1 24.5-34.9 40.2zM248 160h136v328c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V24C0 10.7 10.7 0 24 0h200v136c0 13.2 10.8 24 24 24zm-8 171.8c-20-12.2-33.3-29-42.7-53.8 4.5-18.5 11.6-46.6 6.2-64.2-4.7-29.4-42.4-26.5-47.8-6.8-5 18.3-.4 44.1 8.1 77-11.6 27.6-28.7 64.6-40.8 85.8-.1 0-.1 .1-.2 .1-27.1 13.9-73.6 44.5-54.5 68 5.6 6.9 16 10 21.5 10 17.9 0 35.7-18 61.1-61.8 25.8-8.5 54.1-19.1 79-23.2 21.7 11.8 47.1 19.5 64 19.5 29.2 0 31.2-32 19.7-43.4-13.9-13.6-54.3-9.7-73.6-7.2zM377 105L279 7c-4.5-4.5-10.6-7-17-7h-6v128h128v-6.1c0-6.3-2.5-12.4-7-16.9zm-74.1 255.3c4.1-2.7-2.5-11.9-42.8-9 37.1 15.8 42.8 9 42.8 9z"/></svg>',
+  "file-alt":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm64 236c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-64c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12v8zm0-72v8c0 6.6-5.4 12-12 12H108c-6.6 0-12-5.4-12-12v-8c0-6.6 5.4-12 12-12h168c6.6 0 12 5.4 12 12zm96-114.1v6.1H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 98c4.5 4.5 7 10.6 7 16.9z"/></svg>',
+  "file-archive":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M377 105L279.1 7c-4.5-4.5-10.6-7-17-7H256v128h128v-6.1c0-6.3-2.5-12.4-7-16.9zM128.4 336c-17.9 0-32.4 12.1-32.4 27 0 15 14.6 27 32.5 27s32.4-12.1 32.4-27-14.6-27-32.5-27zM224 136V0h-63.6v32h-32V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zM95.9 32h32v32h-32zm32.3 384c-33.2 0-58-30.4-51.4-62.9L96.4 256v-32h32v-32h-32v-32h32v-32h-32V96h32V64h32v32h-32v32h32v32h-32v32h32v32h-32v32h22.1c5.7 0 10.7 4.1 11.8 9.7l17.3 87.7c6.4 32.4-18.4 62.6-51.4 62.6z"/></svg>',
+  "file-video":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M384 121.9V128H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 97.9A24 24 0 0 1 384 121.9zM224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm96 144v112c0 21.4-25.9 32-41 17L224 353.9V392c0 13.3-10.7 24-24 24H88c-13.3 0-24-10.7-24-24V280c0-13.3 10.7-24 24-24h112c13.3 0 24 10.7 24 24v38.1l55-55c15-15 41-4.5 41 17z"/></svg>',
+  file: '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M224 136V0H24C10.7 0 0 10.7 0 24v464c0 13.3 10.7 24 24 24h336c13.3 0 24-10.7 24-24V160H248c-13.2 0-24-10.8-24-24zm160-14.1v6.1H256V0h6.1c6.4 0 12.5 2.5 17 7l97.9 98c4.5 4.5 7 10.6 7 16.9z"/></svg>',
+  check:
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>',
+  folder:
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="16" width="16" viewBox="0 0 512 512"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M464 128H272l-64-64H48C21.5 64 0 85.5 0 112v288c0 26.5 21.5 48 48 48h416c26.5 0 48-21.5 48-48V176c0-26.5-21.5-48-48-48z"/></svg>',
+  text: '<svg width=\'17\' height=\'17\' fill=\'#000\' height="64px" width="64px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 189.127 189.127" xml:space="preserve" fill="#262626"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path style="fill:#262626;" d="M177.688,0H11.438c-4.143,0-7.5,3.358-7.5,7.5v46.23c0,4.142,3.357,7.5,7.5,7.5s7.5-3.358,7.5-7.5V15 h68.125v159.127H62.688c-4.143,0-7.5,3.358-7.5,7.5s3.357,7.5,7.5,7.5h63.75c4.143,0,7.5-3.358,7.5-7.5s-3.357-7.5-7.5-7.5h-24.375 V15h68.125v38.73c0,4.142,3.357,7.5,7.5,7.5s7.5-3.358,7.5-7.5V7.5C185.188,3.358,181.831,0,177.688,0z"></path> </g></svg>',
+  "trash-alt":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' fill="#5f6368" xmlns="http://www.w3.org/2000/svg" height="16" width="14" viewBox="0 0 448 512"><path d="M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.7 23.7 0 0 0 -21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0 -16-16z"/></svg>',
+  lock: '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5f6368"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm240-120q33 0 56.5-23.5T560-360q0-33-23.5-56.5T480-440q-33 0-56.5 23.5T400-360q0 33 23.5 56.5T480-280ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>',
+  drawing:
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M20.07 3.456a3.135 3.135 0 0 0-4.434 0L10.25 8.843a3.38 3.38 0 0 0-.884 1.55l-.845 3.292c-.205.8.522 1.527 1.322 1.323l3.278-.837a3.384 3.384 0 0 0 1.555-.886L20.07 7.89a3.135 3.135 0 0 0 0-4.434Zm-2.117 4.43 1.057-1.057a1.635 1.635 0 0 0-2.313-2.313l-1.056 1.057 2.312 2.312Zm-1.166 1.166-3.172 3.172c-.24.24-.539.41-.866.493l-2.602.665.67-2.616a1.88 1.88 0 0 1 .492-.862l3.165-3.164 2.313 2.312Z"></path><path d="M5.144 15.022a.641.641 0 1 0 0 1.282h13.751a2.109 2.109 0 0 1 0 4.218H9.194a.75.75 0 0 1 0-1.5h9.701a.609.609 0 1 0 0-1.218H5.144a2.141 2.141 0 0 1 0-4.282h1.862v1.5H5.144Z"></path></svg>',
+  "eye-open":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#5f6368"><path d="M480-312q70 0 119-49t49-119q0-70-49-119t-119-49q-70 0-119 49t-49 119q0 70 49 119t119 49Zm0-72q-40 0-68-28t-28-68q0-40 28-68t68-28q40 0 68 28t28 68q0 40-28 68t-68 28Zm0 192q-142.6 0-259.8-78.5Q103-349 48-480q55-131 172.2-209.5Q337.4-768 480-768q142.6 0 259.8 78.5Q857-611 912-480q-55 131-172.2 209.5Q622.6-192 480-192Zm0-288Zm0 216q112 0 207-58t146-158q-51-100-146-158t-207-58q-112 0-207 58T127-480q51 100 146 158t207 58Z"/></svg>',
+  "eye-close":
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 -960 960 960" width="20px" fill="#5f6368"><path d="m637-425-62-62q4-38-23-65.5T487-576l-62-62q13-5 27-7.5t28-2.5q70 0 119 49t49 119q0 14-2.5 28t-8.5 27Zm133 133-52-52q36-28 65.5-61.5T833-480q-49-101-144.5-158.5T480-696q-26 0-51 3t-49 10l-58-58q38-15 77.5-21t80.5-6q143 0 261.5 77.5T912-480q-22 57-58.5 103.5T770-292Zm-2 202L638-220q-38 14-77.5 21t-80.5 7q-143 0-261.5-77.5T48-480q22-57 58-104t84-85L90-769l51-51 678 679-51 51ZM241-617q-35 28-65 61.5T127-480q49 101 144.5 158.5T480-264q26 0 51-3.5t50-9.5l-45-45q-14 5-28 7.5t-28 2.5q-70 0-119-49t-49-119q0-14 3.5-28t6.5-28l-81-81Zm287 89Zm-96 96Z"/></svg>',
+  layers:
+    '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="m19.474 12.838 1.697.835a1 1 0 0 1 0 1.795L13.32 19.33a3 3 0 0 1-2.649 0L2.82 15.468a1 1 0 0 1 0-1.795l1.697-.835 1.698.836-1.821.896 6.94 3.415a1.5 1.5 0 0 0 1.324 0l6.94-3.415-1.822-.896 1.7-.836ZM13.32 4.673l7.852 3.864a1 1 0 0 1 0 1.794l-7.852 3.864a3 3 0 0 1-2.649 0L2.82 10.33a1 1 0 0 1 0-1.794l7.851-3.864a3 3 0 0 1 2.65 0Zm-1.986 8.176a1.5 1.5 0 0 0 1.324 0l6.94-3.415-6.94-3.415a1.5 1.5 0 0 0-1.324 0l-6.94 3.415 6.94 3.415Z"></path></svg>',
+};
 
-export { canvas, plugins, SVG_ICONS, CANVAS_OBJECT_DYNAMIC_KEYS };
+// Initialize the Alpine.js data and components
+document.addEventListener("alpine:init", () => {
+  // Create a global store for shared canvas state
+  Alpine.store("editor", {
+    canvas: null,
+    selectedObject: null,
+    layers: [],
+
+    initialize() {
+      // We'll initialize the canvas when the DOM is ready
+      this.initializeCanvas();
+      this.setupEventListeners();
+    },
+
+    initializeCanvas() {
+      const canvasContainer = document.querySelector(".canvas-area");
+      const width = canvasContainer
+        ? canvasContainer.offsetWidth
+        : window.innerWidth;
+      const height = canvasContainer
+        ? canvasContainer.offsetHeight
+        : window.innerHeight;
+
+      this.canvas = new Canvas("image-editor", {
+        preserveObjectStacking: true,
+        selectionKey: "ctrlKey",
+        selection: true,
+        width: width,
+        height: height,
+        backgroundColor: "#fff",
+      });
+
+      this.canvas.backgroundColor = "white";
+      this.canvas.renderAll();
+    },
+
+    setupEventListeners() {
+      if (!this.canvas) return;
+
+      // Basic selection event
+      this.canvas.on("selection:created", (e) => {
+        this.selectedObject = e.selected[0];
+        this.updateLayers();
+      });
+
+      this.canvas.on("selection:updated", (e) => {
+        this.selectedObject = e.selected[0];
+      });
+
+      this.canvas.on("selection:cleared", () => {
+        this.selectedObject = null;
+      });
+
+      // More event listeners can be added here
+    },
+
+    updateLayers() {
+      // Update the layers array from canvas objects
+      if (!this.canvas) return;
+
+      this.layers = this.canvas.getObjects().map((obj) => {
+        return {
+          id: obj.id || this.generateUniqueId(),
+          name: obj.name || "Unnamed Layer",
+          type: obj.type,
+          visible: !obj.invisible,
+          object: obj,
+        };
+      });
+    },
+
+    generateUniqueId() {
+      return "layer-" + Math.random().toString(36).substring(2, 9);
+    },
+  });
+
+  // Context Menu Component
+  Alpine.data("contextMenu", () => ({
+    isOpen: false,
+    posX: 0,
+    posY: 0,
+    isLocked: false,
+    isGrouped: false,
+    targetObject: null,
+
+    init() {
+      // Setup event listeners for right click
+      document.addEventListener("contextmenu", (e) => {
+        const canvas = Alpine.store("editor").canvas;
+        if (!canvas) return;
+
+        // Check if click is on canvas
+        const canvasEl = document.getElementById("image-editor");
+        if (canvasEl.contains(e.target)) {
+          e.preventDefault();
+
+          // Get canvas coordinates
+          const pointer = canvas.getPointer(e);
+          const objects = canvas.getObjects();
+
+          // Find object under cursor
+          const clickedObject = objects.find((obj) => {
+            return canvas.containsPoint(e, obj);
+          });
+
+          if (clickedObject) {
+            canvas.setActiveObject(clickedObject);
+            this.targetObject = clickedObject;
+            this.isLocked =
+              clickedObject.lockMovementX && clickedObject.lockMovementY;
+            this.isGrouped = clickedObject.type === "group";
+            this.open(e.clientX, e.clientY);
+          }
+        }
+      });
+    },
+
+    open(x, y) {
+      this.posX = x;
+      this.posY = y;
+      this.isOpen = true;
+    },
+
+    close() {
+      this.isOpen = false;
+    },
+
+    handleAction(action) {
+      const canvas = Alpine.store("editor").canvas;
+      if (!canvas || !this.targetObject) return;
+
+      switch (action) {
+        case "bringForward":
+          canvas.bringForward(this.targetObject);
+          break;
+        case "sendBackwards":
+          canvas.sendBackwards(this.targetObject);
+          break;
+        case "delete":
+          canvas.remove(this.targetObject);
+          Alpine.store("editor").updateLayers();
+          break;
+      }
+
+      canvas.renderAll();
+      this.close();
+    },
+
+    toggleLock() {
+      if (!this.targetObject) return;
+
+      this.isLocked = !this.isLocked;
+      this.targetObject.lockMovementX = this.isLocked;
+      this.targetObject.lockMovementY = this.isLocked;
+      Alpine.store("editor").canvas.renderAll();
+      this.close();
+    },
+
+    toggleGroup() {
+      const canvas = Alpine.store("editor").canvas;
+      if (!canvas) return;
+
+      if (this.isGrouped && this.targetObject) {
+        // Ungroup
+        const items = this.targetObject.getObjects();
+        this.targetObject.destroy();
+        canvas.remove(this.targetObject);
+        canvas.add(...items);
+        canvas.renderAll();
+      } else if (canvas.getActiveObjects().length > 1) {
+        // Group
+        const group = new fabric.Group(canvas.getActiveObjects());
+        canvas.discardActiveObject();
+        canvas.remove(...group.getObjects());
+        canvas.add(group);
+        canvas.setActiveObject(group);
+        canvas.renderAll();
+      }
+
+      Alpine.store("editor").updateLayers();
+      this.close();
+    },
+  }));
+
+  // Initialize other Alpine.js components here
+});
+
+// Initialize Alpine store when DOM is loaded
+window.addEventListener("DOMContentLoaded", () => {
+  if (Alpine.store("editor")) {
+    Alpine.store("editor").initialize();
+  }
+});
+
+// Export constants for use in other modules if needed
+export { CANVAS_OBJECT_DYNAMIC_KEYS, plugins, SVG_ICONS };

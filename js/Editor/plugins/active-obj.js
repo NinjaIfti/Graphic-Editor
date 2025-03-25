@@ -1,355 +1,615 @@
-import $ from 'jquery';
-import { canvas } from '../app.js';
-import { Rect } from 'fabric';
-import { isJson } from '../../Functions/functions.js';
+// js/Editor/plugins/active-obj.js
+import { canvas } from "../app.js";
+import { Rect } from "fabric";
+import { isJson } from "../../Functions/functions.js";
 import { getRangeFromPercentage } from "./curve-text.js";
 import { activeObjPropsPanel } from "../panels/index.js";
-let $propsPanel = $('.single-panel');
 
-// Fill active object props inputs
-function fillActiveObjPropsInputs($targets = $(".cn-obj-props-changer")) {
+// Store the active object properties
+let activeObjectProperties = {};
 
-    $propsPanel = $('.single-panel');
+// Fill active object properties function (will be triggered by Alpine components)
+function fillActiveObjPropsInputs() {
+  let obj = canvas.getActiveObject();
+  if (!obj || !obj.originalItem || obj.originalItem.type === "group") {
+    return false;
+  }
 
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    if (!obj.originalItem) return false;
-    if (obj.originalItem.type === "group") return false;
+  let panelId = obj.originalItem.class == "text" ? "text" : "uploads";
 
-    if (obj.originalItem.class == 'text') $propsPanel = $('.single-panel#text');
-    else $propsPanel = $('.single-panel#uploads');
+  // Emit event for Alpine components to update
+  document.dispatchEvent(
+    new CustomEvent("active-object-changed", {
+      detail: {
+        object: obj,
+        panelId: panelId,
+        properties: getObjectProperties(obj),
+      },
+    })
+  );
 
-
-    $targets.each(function () {
-        let prop = $(this).dataVal("prop"),
-            inputType = $(this).attr("type"),
-            val = $(this).val(),
-            isBoolean = $(this).dataVal("value-type") === "boolean",
-            propVal = obj[prop],
-            objType = obj.originalItem.class,
-            isToggleType = ["checkbox", "radio"].includes(inputType);
-
-        if (isBoolean) if (isJson(val)) val = JSON.parse(val);
-
-        // Validate value
-        if (inputType == "number" || inputType == "range")
-            if (typeof propVal !== "object") propVal = parseFloat(propVal);
-
-        if (prop === 'charSpacing' && obj.type == 'curved-text') propVal = obj.kerning;
-        if (prop === 'stroke' && obj.type == 'curved-text') propVal = obj.strokeStyle;
-
-        // Shadow
-        if (prop === "shadow" && propVal) {
-            // Shadow
-            let $shadowCon = $propsPanel.find(".cn-obj-props-shadow")
-            $shadowCon.find(`.cn-obj-props-changer[name="color"]`).val(propVal.color);
-            $shadowCon.find(`.cn-obj-props-changer[name="blur"]`).val(propVal.blur);
-            $shadowCon.find(`.cn-obj-props-changer[name="offsetX"]`).val(propVal.offsetX);
-            $shadowCon.find(`.cn-obj-props-changer[name="offsetY"]`).val(propVal.offsetY);
-        } else if (prop === 'fontFamily' && objType == 'text') {
-            let $dropdown = $('.canvas-tool.font-family .editor-dropdown');
-            $dropdown.attr("value", obj.fontFamily);
-            $dropdown.find(".dropdown-toggle-item .item-html").text(obj.fontFamily);
-            $dropdown.find('.item').removeClass("selected");
-            $dropdown.find(`.item[value="${obj.fontFamily}"]`).addClass("selected");
-        } else if (isToggleType) {
-            $(this).prop("checked", propVal === val);
-            if ($(this).hasClass("prop-toggle-checkbox")) {
-                $(this).trigger("canvasObjChanged");
-            }
-        } else {
-            let fill = $(this).dataVal('fill-val');
-            if (fill)
-                $(fill).val(propVal);
-
-            $(this).val(propVal);
-        }
-    });
+  return true;
 }
 
-// object properties change event
-function objPropsInputsHandler() {
+// Get all relevant properties from an object
+function getObjectProperties(obj) {
+  if (!obj) return {};
 
-    $(".cn-obj-props-changer:not([data-launch-prop])").each(function () {
-        $(this).attr("data-launch-prop", "true");
+  let properties = {
+    type: obj.type,
+    originalType: obj.originalItem?.class,
+    id: obj.id,
+    fill: obj.fill,
+    opacity: obj.opacity,
+    stroke: obj.type === "curved-text" ? obj.strokeStyle : obj.stroke,
+    strokeWidth: obj.strokeWidth,
+    fontFamily: obj.fontFamily,
+    fontSize: obj.fontSize,
+    fontWeight: obj.fontWeight,
+    fontStyle: obj.fontStyle,
+    underline: obj.underline,
+    charSpacing: obj.type === "curved-text" ? obj.kerning : obj.charSpacing,
+    angle: obj.angle,
+    scaleX: obj.scaleX,
+    scaleY: obj.scaleY,
+    skewX: obj.skewX,
+    skewY: obj.skewY,
+  };
 
-        let tagName = $(this).tagName(),
-            inputType = $(this).attr('type'),
-            isToggleType = ["checkbox", "radio"].includes(inputType),
-            event = tagName == 'input' ? 'input' : 'click',
-            dataUncheckValue = $(this).dataVal("uncheck");
+  // Shadow properties
+  if (obj.shadow) {
+    properties.shadowEnabled = true;
+    properties.shadowColor = obj.shadow.color;
+    properties.shadowBlur = obj.shadow.blur;
+    properties.shadowOffsetX = obj.shadow.offsetX;
+    properties.shadowOffsetY = obj.shadow.offsetY;
+  } else {
+    properties.shadowEnabled = false;
+  }
 
-        if (isToggleType || inputType == "file" || tagName === "select") event = "change";
-
-        // Apply listener
-        $(this).on(event, function () {
-            $propsPanel = $('.single-panel');
-
-            let val = $(this).val(),
-                obj = canvas.getActiveObject(),
-                type = obj?.type,
-                isChecked = isToggleType ? $(this).is(":checked") : null,
-                prop = $(this).dataVal('prop'),
-                fillVal = $(this).dataVal("fill-val"),
-                propValue = $(this).dataVal("prop-value");
-            if (propValue) val = propValue;
-            if (!prop) return false;
-
-
-            if (obj.originalItem.class == 'text') $propsPanel = $('.single-panel#text');
-            else $propsPanel = $('.single-panel#uploads');
-
-
-
-            // Check if value is boolean
-            if ($(this).dataVal("value-type") === "boolean") {
-                if (isJson(val)) val = JSON.parse(val);
-                if (isToggleType) val = isChecked;
-            }
-
-            // Set Un Check value
-            if (isToggleType) {
-                if (!isChecked && dataUncheckValue)
-                    val = dataUncheckValue;
-            }
-
-            // Fill Val
-            if (fillVal) $(fillVal).not(this).val(val);
-
-            // Validate value for (Number,Range)
-            if (inputType == "number" || inputType == "range") {
-                val = parseFloat(val);
-                if (isNaN(val)) return false;
-            }
-
-
-            // Shadow
-            if (prop == 'shadow' && obj.shadowCheck) {
-                let $shadowCon = $propsPanel.find(".cn-obj-props-shadow"),
-                    shadow = {
-                        color: $shadowCon.find(`.cn-obj-props-changer[name="color"]`).val(),
-                        blur: parseInt($shadowCon.find(`.cn-obj-props-changer[name="blur"]`).val()),
-                        offsetX: parseInt($shadowCon.find(`.cn-obj-props-changer[name="offsetX"]`).val()),
-                        offsetY: parseInt($shadowCon.find(`.cn-obj-props-changer[name="offsetY"]`).val()),
-                    };
-
-                val = shadow;
-            }
-
-
-            // Object Radius
-            if (prop === 'clipPath') {
-                let radius = Math.abs(val);
-
-                if (obj.originalItem.class === 'shape') {
-                    let objWidth = obj.width + obj.height,
-                        radiusPer = (radius * objWidth) / 100;
-                    obj.set({
-                        rx: radiusPer / obj.scaleX,
-                        ry: radiusPer / obj.scaleY,
-                    });
-                    canvas.renderAll();
-                    console.log("running");
-                    return false;
-                }
-                val = (target) => {
-                    let objWidth = target.width + target.height,
-                        radiusPer = (radius * objWidth) / 100;
-
-                    let svg = new Rect({
-                        width: target.width,
-                        height: target.height,
-                        rx: radiusPer / target.scaleX,
-                        ry: radiusPer / target.scaleY,
-                        left: -target.width / 2,
-                        top: -target.height / 2,
-                        objectCaching: false,
-                        dirty: true
-                    });
-                    return svg;
-                }
-            }
-
-            if (type == 'curved-text' && prop === 'charSpacing') prop = 'kerning';
-
-            if (type == 'curved-text' && prop === 'stroke') prop = 'strokeStyle';
-
-
-
-            // Property toggler checkbox
-            if ($(this).hasClass("prop-toggle-checkbox") && obj) {
-
-                let targetProp = $(this).data("target-prop"),
-                    isChecked = $(this).is(":checked") ? true : false,
-                    oldPropsKey = `${prop}Old`,
-                    oldProps = obj[oldPropsKey] || {};
-
-                val = isChecked;
-                obj.set(prop, val);
-                canvas.requestRenderAll();
-
-                // Shadow
-                if (targetProp === "shadow") {
-                    if (!isChecked) {
-                        oldProps.shadow = {
-                            color: '#0000',
-                            blur: 0,
-                            offsetX: 0,
-                            offsetY: 0,
-                        }
-                    }
-
-                    let currentValues = {};
-                    for (let key in oldProps.shadow) {
-                        let keyValue = oldProps.shadow[key],
-                            $input = $propsPanel.find(`[data-prop="shadow"][name="${key}"]`);
-                        currentValues[key] = $input.val();
-                        $input.val(keyValue);
-                    }
-
-                    $propsPanel.find(`[data-prop="shadow"][name="blur"]`).trigger("input");
-                    if (!isChecked) oldProps[prop] = currentValues;
-
-                    return true;
-                }
-
-                if (!isChecked) obj[oldPropsKey] = oldProps;
-
-                $(this).val(val.toString());
-                return true;
-            }
-
-            // Rotate
-            if (prop === "angle") {
-                val = target => {
-                    target.rotate(originalValue);
-                    return undefined;
-                }
-            }
-
-            //#region BringForward &  SendBackwards
-            if (prop === "bringForward") {
-                val = target => {
-                    canvas.bringForward(target);
-                    return undefined;
-                }
-            }
-
-            if (prop === "sendBackwards") {
-                val = target => {
-                    canvas.sendBackwards(target);
-                    return undefined;
-                }
-            }
-
-            //#endregion BringForward &  SendBackwards
-
-            // Set Active Obj Prop
-            activeObjPropSet({
-                [prop]: val
-            });
-        });
-    });
+  return properties;
 }
-
-objPropsInputsHandler();
 
 // Set Active Object Properties
 const activeObjPropSet = (properties = {}, targetType = null) => {
-    let activeObj = canvas.getActiveObject();
+  let activeObj = canvas.getActiveObject();
 
-    if (!activeObj) return false;
+  if (!activeObj) return false;
 
-    if (targetType) {
-        if (activeObj.type != targetType)
-            return false;
+  if (targetType) {
+    if (activeObj.type != targetType) return false;
+  }
+
+  // Is Check Multiple Objects
+  let objects = activeObj._objects ? activeObj._objects : [activeObj];
+
+  Array.from(objects).forEach((obj) => {
+    for (let key in properties) {
+      let value = properties[key];
+      if (typeof value == "function") properties[key] = value(obj);
+
+      if (properties[key] === undefined) delete properties[key];
     }
 
-    // Is Check Multiple Objects
-    let objects = (activeObj._objects) ? activeObj._objects : [activeObj];
-    // objects = [activeObj];
-    Array.from(objects).forEach(obj => {
-        for (let key in properties) {
-            let value = properties[key];
-            if (typeof value == 'function')
-                properties[key] = value(obj);
+    obj.set(properties);
+    if (obj.type == "curved-text") {
+      obj.refreshCtx(true);
+      obj._updateObj("scaleX", obj.scaleX);
+      obj._updateObj("scaleY", obj.scaleY);
+    }
+  });
 
-            if (properties[key] === undefined)
-                delete properties[key];
-        }
+  canvas.renderAll();
 
-        obj.set(properties);
-        if (obj.type == 'curved-text') {
-            obj.refreshCtx(true);
-            obj._updateObj('scaleX', obj.scaleX);
-            obj._updateObj('scaleY', obj.scaleY);
-        }
-    });
-    canvas.renderAll();
-}
+  // Notify Alpine components about the property change
+  document.dispatchEvent(
+    new CustomEvent("object-properties-updated", {
+      detail: {
+        object: activeObj,
+      },
+    })
+  );
+};
 
-// Object events
+// Initialize object events
 function initObjectEvents() {
-    let events = ['moving', 'scaling', 'rotating', 'skewing', 'resizing'];
-    events.forEach(event => {
-        canvas.on(`object:${event}`, function (e) {
-            let obj = e.target;
+  let events = ["moving", "scaling", "rotating", "skewing", "resizing"];
+  events.forEach((event) => {
+    canvas.on(`object:${event}`, function (e) {
+      let obj = e.target;
 
-            //#region Curved Text Setting
+      if (obj.type == "curved-text" && event !== "moving") {
+        // Notify Alpine components about curved text updates
+        document.dispatchEvent(
+          new CustomEvent("curved-text-updated", {
+            detail: {
+              percentage: getRangeFromPercentage(obj.percentage),
+              rotateAngle: obj.rotateAngle || 0,
+            },
+          })
+        );
 
+        obj.refreshCtx(true);
+        obj._updateObj("scaleX", obj.scaleX);
+        obj._updateObj("scaleY", obj.scaleY);
+      }
 
-            if (obj.type == 'curved-text' && event !== 'moving') {
-
-                $('#text-curve-range').val(getRangeFromPercentage(obj.percentage))
-                $('#curve-text').val(obj.rotateAngle ? obj.rotateAngle : 0);
-
-                obj.refreshCtx(true);
-                obj._updateObj('scaleX', obj.scaleX);
-                obj._updateObj('scaleY', obj.scaleY);
-            }
-            //#endregion Curved Text Setting 
-
-            fillActiveObjPropsInputs();
-        });
+      fillActiveObjPropsInputs();
     });
+  });
 }
-initObjectEvents();
 
-// Created and updated obj prop
+// Handle object selection changes
 const createdAndUpdatedProp = (e) => {
-    let obj = canvas.getActiveObject();
-    if (!obj) return false;
-    activeObjPropsPanel(obj.originalItem?.class);   // Active Obj props panel
-    fillActiveObjPropsInputs();
+  let obj = canvas.getActiveObject();
+  if (!obj) {
+    // No object selected, notify Alpine components
+    document.dispatchEvent(new CustomEvent("active-object-cleared"));
+    return false;
+  }
 
-    // TODO: Layer Active
+  // Activate appropriate panel
+  activeObjPropsPanel(obj.originalItem?.class);
+
+  // Update inputs with new object properties
+  fillActiveObjPropsInputs();
+
+  // Notify Alpine components about selection
+  document.dispatchEvent(
+    new CustomEvent("selection-created", {
+      detail: {
+        object: obj,
+        type: obj.originalItem?.class || obj.type,
+      },
+    })
+  );
+};
+
+// Setup canvas event listeners
+function setupCanvasEventListeners() {
+  // Objects Selection Created
+  canvas.on("selection:created", function (e) {
+    createdAndUpdatedProp(e);
+  });
+
+  // Objects Selection Updated
+  canvas.on("selection:updated", function (e) {
+    createdAndUpdatedProp(e);
+  });
+
+  // Selection cleared
+  canvas.on("selection:cleared", function () {
+    createdAndUpdatedProp();
+  });
 }
 
-// Objects Selection Created
-canvas.on("selection:created", function (e) {
-    createdAndUpdatedProp(e);
+// Initialize events
+initObjectEvents();
+setupCanvasEventListeners();
+
+// Create Alpine components for property panels
+document.addEventListener("alpine:init", () => {
+  // Component for text properties panel
+  Alpine.data("textPanel", () => ({
+    isActive: false,
+    selectedObject: null,
+    textProperties: {
+      fill: "#262626",
+      fontFamily: "sans-serif",
+      fontSize: 40,
+      fontWeight: "normal",
+      fontStyle: "normal",
+      underline: false,
+      charSpacing: 0,
+      opacity: 1,
+      stroke: "#000000",
+      strokeWidth: 0,
+      skewX: 0,
+      skewY: 0,
+      rotation: 0,
+      shadowEnabled: false,
+      shadowColor: "#000000",
+      shadowBlur: 5,
+      shadowOffsetX: 5,
+      shadowOffsetY: 5,
+    },
+    showDistortion: false,
+    showShadow: false,
+    fonts: [
+      "Arial",
+      "Verdana",
+      "Helvetica",
+      "Tahoma",
+      "Trebuchet MS",
+      "Times New Roman",
+      "Georgia",
+      "Garamond",
+      "Courier New",
+      "Brush Script MT",
+    ],
+
+    init() {
+      // Listen for active object changes
+      document.addEventListener("active-object-changed", (e) => {
+        if (e.detail.panelId === "text") {
+          this.selectedObject = e.detail.object;
+          this.updateTextProperties(e.detail.properties);
+        } else {
+          this.selectedObject = null;
+        }
+      });
+
+      document.addEventListener("active-object-cleared", () => {
+        this.selectedObject = null;
+      });
+
+      document.addEventListener("change-tool", (e) => {
+        this.isActive = e.detail.type === "text";
+      });
+    },
+
+    updateTextProperties(props) {
+      // Update our local Alpine properties with the ones from the fabric object
+      if (!props) return;
+
+      this.textProperties = {
+        ...this.textProperties,
+        ...props,
+      };
+    },
+
+    addText() {
+      const item = {
+        src: "Add text here",
+        type: "text",
+        fileType: "text",
+      };
+
+      const properties = {
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        fontSize: 40,
+        fontFamily: this.textProperties.fontFamily,
+      };
+
+      // Use the AddItemToEditor function from your editor module
+      // You'll need to import or access this function in your actual implementation
+      window.AddItemToEditor(item, properties);
+    },
+
+    addHeading(type) {
+      const textContent =
+        type === "full"
+          ? "Add a heading"
+          : type === "sub"
+          ? "Add a subheading"
+          : "Add a little bit of body text";
+
+      const fontSize = type === "full" ? 48 : type === "sub" ? 36 : 24;
+
+      const fontWeight = type === "full" || type === "sub" ? "bold" : "normal";
+
+      const item = {
+        src: textContent,
+        type: "text",
+        fileType: "text",
+      };
+
+      const properties = {
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        fontSize: fontSize,
+        fontFamily: this.textProperties.fontFamily,
+        fontWeight: fontWeight,
+      };
+
+      window.AddItemToEditor(item, properties);
+    },
+
+    updateObjectProperty(prop, value) {
+      if (!this.selectedObject) return;
+
+      const updateProps = {
+        [prop]: value,
+      };
+
+      activeObjPropSet(updateProps);
+
+      // Update local state
+      this.textProperties[prop] = value;
+    },
+
+    toggleFontWeight() {
+      if (!this.selectedObject) return;
+
+      const newWeight =
+        this.textProperties.fontWeight === "bold" ? "normal" : "bold";
+      this.updateObjectProperty("fontWeight", newWeight);
+    },
+
+    toggleFontStyle() {
+      if (!this.selectedObject) return;
+
+      const newStyle =
+        this.textProperties.fontStyle === "italic" ? "normal" : "italic";
+      this.updateObjectProperty("fontStyle", newStyle);
+    },
+
+    toggleUnderline() {
+      if (!this.selectedObject) return;
+
+      const newValue = !this.textProperties.underline;
+      this.updateObjectProperty("underline", newValue);
+    },
+
+    updateTextCurve(value) {
+      if (!this.selectedObject || this.selectedObject.type !== "curved-text")
+        return;
+
+      // Handle curved text update
+      // You'll need to implement this based on your curved text functionality
+    },
+
+    selectFont(font) {
+      this.textProperties.fontFamily = font;
+
+      if (this.selectedObject) {
+        this.updateObjectProperty("fontFamily", font);
+      }
+    },
+
+    filterFonts() {
+      // Filter fonts based on search - this would be implemented in your component
+    },
+
+    toggleShadow() {
+      if (!this.selectedObject) return;
+
+      if (this.textProperties.shadowEnabled) {
+        this.updateObjectProperty("shadow", {
+          color: this.textProperties.shadowColor,
+          blur: parseInt(this.textProperties.shadowBlur),
+          offsetX: parseInt(this.textProperties.shadowOffsetX),
+          offsetY: parseInt(this.textProperties.shadowOffsetY),
+        });
+      } else {
+        this.updateObjectProperty("shadow", null);
+      }
+    },
+
+    updateShadow(type, value) {
+      if (!this.selectedObject || !this.textProperties.shadowEnabled) return;
+
+      this.textProperties[
+        "shadow" + type.charAt(0).toUpperCase() + type.slice(1)
+      ] = value;
+
+      this.updateObjectProperty("shadow", {
+        color: this.textProperties.shadowColor,
+        blur: parseInt(this.textProperties.shadowBlur),
+        offsetX: parseInt(this.textProperties.shadowOffsetX),
+        offsetY: parseInt(this.textProperties.shadowOffsetY),
+      });
+    },
+  }));
+
+  // Component for upload/image properties panel - similar structure to text panel
+  Alpine.data("uploadsPanel", () => ({
+    isActive: false,
+    selectedObject: null,
+    uploads: [],
+    objectProperties: {
+      opacity: 1,
+      stroke: "#000000",
+      strokeWidth: 0,
+      skewX: 0,
+      skewY: 0,
+      radius: 0,
+      fill: "#ffffff",
+      shadowEnabled: false,
+      shadowColor: "#000000",
+      shadowBlur: 5,
+      shadowOffsetX: 5,
+      shadowOffsetY: 5,
+    },
+    filters: {
+      brightness: 0,
+      contrast: 0,
+      saturation: 0,
+      blur: 0,
+      noise: 0,
+      pixelate: 0,
+      hue: 0,
+    },
+    activeFilter: "",
+    showDistortion: false,
+    showShadow: false,
+
+    init() {
+      // Listen for active object changes
+      document.addEventListener("active-object-changed", (e) => {
+        if (e.detail.panelId === "uploads") {
+          this.selectedObject = e.detail.object;
+          this.updateObjectProperties(e.detail.properties);
+        } else {
+          this.selectedObject = null;
+        }
+      });
+
+      document.addEventListener("active-object-cleared", () => {
+        this.selectedObject = null;
+      });
+
+      document.addEventListener("change-tool", (e) => {
+        this.isActive = e.detail.type === "uploads";
+      });
+    },
+
+    updateObjectProperties(props) {
+      if (!props) return;
+
+      this.objectProperties = {
+        ...this.objectProperties,
+        ...props,
+      };
+    },
+
+    handleFileUpload(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+
+      // Process each file
+      Array.from(files).forEach((file) => {
+        // Create a URL for the file
+        const url = URL.createObjectURL(file);
+
+        // Add to uploads array
+        this.uploads.push({
+          id: Date.now() + Math.random().toString(36).substr(2, 9),
+          url: url,
+          name: file.name,
+          type: file.type,
+        });
+
+        // Create image upload element
+        this.createUploadElement(url, file.name, file.type);
+      });
+    },
+
+    createUploadElement(url, name, type) {
+      // Create DOM element for the upload preview
+      // This would be handled by Alpine template rendering
+    },
+
+    addImageToCanvas(upload) {
+      const item = {
+        src: upload.url,
+        type: "image",
+        fileType: "image",
+      };
+
+      const properties = {
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+      };
+
+      window.AddItemToEditor(item, properties);
+    },
+
+    updateObjectProperty(prop, value) {
+      if (!this.selectedObject) return;
+
+      const updateProps = {
+        [prop]: value,
+      };
+
+      activeObjPropSet(updateProps);
+
+      // Update local state
+      this.objectProperties[prop] = value;
+    },
+
+    applyFilter(filterName, value) {
+      if (!this.selectedObject) return;
+
+      this.filters[filterName] = value;
+
+      // Apply filters to the object
+      // This will depend on your filter implementation
+    },
+
+    applyPresetFilter(filterName) {
+      if (!this.selectedObject) return;
+
+      this.activeFilter = filterName;
+
+      // Apply preset filter to the object
+      // This will depend on your filter implementation
+    },
+
+    resetFilters() {
+      if (!this.selectedObject) return;
+
+      this.activeFilter = "";
+
+      // Reset all filters
+      Object.keys(this.filters).forEach((key) => {
+        this.filters[key] = 0;
+      });
+
+      // Apply reset to the object
+    },
+
+    updateClipPath(value) {
+      if (!this.selectedObject) return;
+
+      this.objectProperties.radius = value;
+
+      // Apply clip path based on radius
+      const obj = this.selectedObject;
+
+      if (obj.originalItem.class === "shape") {
+        let objWidth = obj.width + obj.height,
+          radiusPer = (value * objWidth) / 100;
+
+        activeObjPropSet({
+          rx: radiusPer / obj.scaleX,
+          ry: radiusPer / obj.scaleY,
+        });
+      } else {
+        const clipFunc = (target) => {
+          let objWidth = target.width + target.height,
+            radiusPer = (value * objWidth) / 100;
+
+          let svg = new Rect({
+            width: target.width,
+            height: target.height,
+            rx: radiusPer / target.scaleX,
+            ry: radiusPer / target.scaleY,
+            left: -target.width / 2,
+            top: -target.height / 2,
+            objectCaching: false,
+            dirty: true,
+          });
+          return svg;
+        };
+
+        activeObjPropSet({
+          clipPath: clipFunc,
+        });
+      }
+    },
+
+    toggleShadow() {
+      if (!this.selectedObject) return;
+
+      if (this.objectProperties.shadowEnabled) {
+        this.updateObjectProperty("shadow", {
+          color: this.objectProperties.shadowColor,
+          blur: parseInt(this.objectProperties.shadowBlur),
+          offsetX: parseInt(this.objectProperties.shadowOffsetX),
+          offsetY: parseInt(this.objectProperties.shadowOffsetY),
+        });
+      } else {
+        this.updateObjectProperty("shadow", null);
+      }
+    },
+
+    updateShadow(type, value) {
+      if (!this.selectedObject || !this.objectProperties.shadowEnabled) return;
+
+      this.objectProperties[
+        "shadow" + type.charAt(0).toUpperCase() + type.slice(1)
+      ] = value;
+
+      this.updateObjectProperty("shadow", {
+        color: this.objectProperties.shadowColor,
+        blur: parseInt(this.objectProperties.shadowBlur),
+        offsetX: parseInt(this.objectProperties.shadowOffsetX),
+        offsetY: parseInt(this.objectProperties.shadowOffsetY),
+      });
+    },
+  }));
 });
 
-// Objects Selection Updated
-canvas.on("selection:updated", function (e) {
-    createdAndUpdatedProp(e);
-});
-
-// selection updated
-canvas.on("selection:cleared", function () {
-    createdAndUpdatedProp();
-});
-
-$(".prop-toggle-checkbox").on("canvasObjChanged", function () {
-    let isChecked = $(this).is(":checked"),
-        $parent = $(this).parents(".folding-card"),
-        $header = $parent.find(".card-header"),
-        $body = $parent.find(".card-body");
-    if (isChecked) {
-        $header.addClass("active");
-        $body.slideDown(0);
-    } else {
-        $header.removeClass("active");
-        $body.slideUp(0);
-    }
-});
+export { activeObjPropSet, fillActiveObjPropsInputs };
