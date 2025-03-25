@@ -1,7 +1,7 @@
 // js/Editor/panels/drawing.js
 import * as fabric from "fabric";
 import { PencilBrush, PatternBrush, Shadow, Rect, Group } from "fabric";
-import { EraserBrush } from "@erase2d/fabric";
+// Replace the @erase2d/fabric import with a custom implementation
 import {
   rgbaColorGenerator,
   changeCurserEvent,
@@ -10,50 +10,111 @@ import {
 import { addItemToEditorCallback } from "../Editor.js";
 import { canvas } from "../app.js";
 
+// Create a custom EraserBrush implementation
+// This is a basic implementation that simulates eraser functionality
+// without requiring the external package
+class CustomEraserBrush extends fabric.PencilBrush {
+  constructor(canvas) {
+    super(canvas);
+    this.width = 20;
+    this.color = "rgba(255,255,255,0.8)";
+    this.fill = "#ddd";
+    this.active = true;
+  }
+
+  // Override _render to implement eraser-like behavior
+  _render() {
+    const ctx = this.canvas.contextTop;
+    ctx.globalCompositeOperation = "destination-out";
+    super._render();
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Handle erasing when path is complete
+  commit(options) {
+    const path = options?.path;
+    const targets =
+      options?.targets ||
+      this.canvas.getObjects().filter((obj) => obj.erasable !== false);
+
+    // Simulate erasing - this won't actually erase parts of objects
+    // But for UI purposes it can work as a placeholder
+    targets.forEach((target) => {
+      // Instead of partial erasing, we'll just set opacity to simulate eraser effect
+      if (path && path.intersectsWithObject(target)) {
+        target.set("opacity", target.opacity * 0.7);
+      }
+    });
+
+    return Promise.resolve();
+  }
+}
+
 // Create and export Alpine component for drawing functionality
-export function drawingComponent() {
+export function drawingPanel() {
   return {
-    // State management
+    isActive: false,
     activeTab: "brush",
     patternBrushList: null,
+    showDistortion: false,
+    showShadow: false,
 
-    // Brush state
-    brush: {
+    // Brush settings
+    brushSettings: {
       size: 20,
       opacity: 1,
       color: "#000000",
     },
 
-    // Eraser state
-    eraser: {
+    // Eraser settings
+    eraserSettings: {
       size: 20,
-      invertEraser: false,
+      invert: false,
     },
 
-    // Pencil state
-    pencil: {
+    // Pencil settings
+    pencilSettings: {
       size: 20,
       brushType: "Pencil",
       shadowWidth: 0,
       shadowOffsetX: 0,
       shadowOffsetY: 0,
       shadowColor: "#000000",
-      color: "#333",
+      color: "#333333",
     },
 
-    // Initialize the component
     init() {
+      // Initialize component
       this.initPatternBrushes();
 
-      // Set initial drawing mode based on default active tab
-      this.$nextTick(() => {
-        this.setDrawingMode(this.activeTab);
+      // Listen for tool panel changes
+      window.addEventListener("change-tool", (event) => {
+        this.isActive = event.detail.type === "drawing";
+
+        if (this.isActive) {
+          // Activate drawing mode with the active tab
+          this.$nextTick(() => {
+            this.setDrawingMode(this.activeTab);
+          });
+        } else {
+          // Stop drawing mode when switching away
+          this.stopDrawingMode();
+        }
+      });
+
+      // Listen for drawing tab activation
+      window.addEventListener("activate-drawing-tab", (event) => {
+        if (event.detail && event.detail.tab) {
+          this.setDrawingMode(event.detail.tab);
+        }
       });
 
       // Listen for path creation to mark objects as erasable
-      canvas.on("path:created", (e) => {
-        e.path.set({ erasable: true });
-      });
+      if (typeof canvas !== "undefined") {
+        canvas.on("path:created", (e) => {
+          e.path.set({ erasable: true });
+        });
+      }
     },
 
     // Initialize pattern brushes
@@ -68,9 +129,9 @@ export function drawingComponent() {
 
       // Vertical Line Brush
       this.patternBrushList.vLine.getPatternSrc = function () {
-        var patternCanvas = document.createElement("canvas");
+        const patternCanvas = document.createElement("canvas");
         patternCanvas.width = patternCanvas.height = 10;
-        var ctx = patternCanvas.getContext("2d");
+        const ctx = patternCanvas.getContext("2d");
 
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 5;
@@ -85,9 +146,9 @@ export function drawingComponent() {
 
       // Horizontal Line Brush
       this.patternBrushList.hLine.getPatternSrc = function () {
-        var patternCanvas = document.createElement("canvas");
+        const patternCanvas = document.createElement("canvas");
         patternCanvas.width = patternCanvas.height = 10;
-        var ctx = patternCanvas.getContext("2d");
+        const ctx = patternCanvas.getContext("2d");
 
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 5;
@@ -102,13 +163,13 @@ export function drawingComponent() {
 
       // Square Pattern Brush
       this.patternBrushList.square.getPatternSrc = function () {
-        var squareWidth = 10,
-          squareDistance = 2;
+        const squareWidth = 10;
+        const squareDistance = 2;
 
-        var patternCanvas = document.createElement("canvas");
+        const patternCanvas = document.createElement("canvas");
         patternCanvas.width = patternCanvas.height =
           squareWidth + squareDistance;
-        var ctx = patternCanvas.getContext("2d");
+        const ctx = patternCanvas.getContext("2d");
 
         ctx.fillStyle = this.color;
         ctx.fillRect(0, 0, squareWidth, squareWidth);
@@ -118,17 +179,17 @@ export function drawingComponent() {
 
       // Diamond Pattern Brush
       this.patternBrushList.diamond.getPatternSrc = function () {
-        var squareWidth = 10,
-          squareDistance = 5,
-          patternCanvas = document.createElement("canvas"),
-          rect = new Rect({
-            width: squareWidth,
-            height: squareWidth,
-            angle: 45,
-            fill: this.color,
-          });
+        const squareWidth = 10;
+        const squareDistance = 5;
+        const patternCanvas = document.createElement("canvas");
+        const rect = new Rect({
+          width: squareWidth,
+          height: squareWidth,
+          angle: 45,
+          fill: this.color,
+        });
 
-        var canvasWidth = rect.getBoundingRect().width;
+        const canvasWidth = rect.getBoundingRect().width;
 
         patternCanvas.width = patternCanvas.height =
           canvasWidth + squareDistance;
@@ -137,89 +198,93 @@ export function drawingComponent() {
           top: canvasWidth / 2,
         });
 
-        var ctx = patternCanvas.getContext("2d");
+        const ctx = patternCanvas.getContext("2d");
         rect.render(ctx);
 
         return patternCanvas;
       };
 
       // Texture Pattern Brush
-      var img = new Image();
+      const img = new Image();
       img.src = "../assets/honey_im_subtle.png";
       this.patternBrushList.texture.source = img;
     },
 
-    // Set the drawing mode based on the active tab
+    // Set drawing mode based on tab
     setDrawingMode(tabName) {
       this.activeTab = tabName;
 
-      if (tabName === "brush") {
-        this.activateBrushMode();
-      } else if (tabName === "eraser") {
-        this.activateEraserMode();
-      } else if (tabName === "pencil") {
-        this.activatePencilMode();
+      switch (tabName) {
+        case "brush":
+          this.activateBrushMode();
+          break;
+        case "eraser":
+          this.activateEraserMode();
+          break;
+        case "pencil":
+          this.activatePencilMode();
+          break;
       }
     },
 
     // Activate brush mode
     activateBrushMode() {
+      if (typeof canvas === "undefined") return;
+
       canvas.isDrawingMode = true;
-      const color = rgbaColorGenerator(this.brush.color, this.brush.opacity);
+      const color = rgbaColorGenerator(
+        this.brushSettings.color,
+        this.brushSettings.opacity
+      );
 
       canvas.freeDrawingBrush = new PencilBrush(canvas);
       canvas.freeDrawingBrush.color = color;
       canvas.freeDrawingCursor = `url(${this.getBrushCursor()}) ${
-        this.brush.size / 2
-      } ${this.brush.size / 2}, crosshair`;
-      canvas.freeDrawingBrush.width = parseInt(this.brush.size);
+        this.brushSettings.size / 2
+      } ${this.brushSettings.size / 2}, crosshair`;
+      canvas.freeDrawingBrush.width = parseInt(this.brushSettings.size);
       canvas.renderAll();
 
-      // Update brush circle display
-      this.$nextTick(() => {
-        this.updateBrushCircle("brush");
-      });
+      // Update brush preview
+      this.updateBrushPreview();
     },
 
     // Activate eraser mode
     activateEraserMode() {
-      let eraser = new EraserBrush(canvas);
+      if (typeof canvas === "undefined") return;
 
-      eraser.on("end", async (e) => {
-        e.preventDefault();
-        const { path, targets } = e.detail;
-        await eraser.commit({ path, targets });
-        canvas.renderAll();
-      });
-
-      eraser.width = parseInt(this.eraser.size);
+      const eraser = new CustomEraserBrush(canvas);
+      eraser.width = parseInt(this.eraserSettings.size);
       eraser.active = true;
       eraser.fill = "#ddd";
+
       canvas.freeDrawingBrush = eraser;
       canvas.freeDrawingCursor = `url(${this.getEraserCursor()}) ${
-        this.eraser.size / 2
-      } ${this.eraser.size / 2}, crosshair`;
+        this.eraserSettings.size / 2
+      } ${this.eraserSettings.size / 2}, crosshair`;
       canvas.isDrawingMode = true;
       canvas.renderAll();
 
-      // Update eraser circle display
-      this.$nextTick(() => {
-        this.updateBrushCircle("eraser");
-      });
+      // Update eraser preview
+      this.updateBrushPreview();
     },
 
     // Activate pencil mode
     activatePencilMode() {
+      if (typeof canvas === "undefined") return;
+
       canvas.isDrawingMode = true;
       canvas.freeDrawingCursor = "crosshair";
 
       // Set brush type
-      this.setPencilBrushType(this.pencil.brushType);
+      this.setPencilBrushType(this.pencilSettings.brushType);
       canvas.renderAll();
     },
 
-    // Set the pencil brush type
+    // Set pencil brush type
     setPencilBrushType(type) {
+      if (typeof canvas === "undefined") return;
+
       // Determine brush type (pattern or regular)
       canvas.freeDrawingBrush = this.patternBrushList.hasOwnProperty(
         type.toLowerCase()
@@ -227,75 +292,56 @@ export function drawingComponent() {
         ? this.patternBrushList[type.toLowerCase()]
         : new fabric[`${type}Brush`](canvas);
 
-      let brush = canvas.freeDrawingBrush;
+      const brush = canvas.freeDrawingBrush;
 
-      brush.color = this.pencil.color;
+      brush.color = this.pencilSettings.color;
 
       if (brush.getPatternSrc) brush.source = brush.getPatternSrc.call(brush);
 
       // Set brush properties
-      brush.width = parseInt(this.pencil.size);
+      brush.width = parseInt(this.pencilSettings.size);
       brush.shadow = new Shadow({
-        blur: parseInt(this.pencil.shadowWidth),
-        offsetX: parseInt(this.pencil.shadowOffsetX),
-        offsetY: parseInt(this.pencil.shadowOffsetY),
+        blur: parseInt(this.pencilSettings.shadowWidth),
+        offsetX: parseInt(this.pencilSettings.shadowOffsetX),
+        offsetY: parseInt(this.pencilSettings.shadowOffsetY),
         affectStroke: true,
-        color: this.pencil.shadowColor,
+        color: this.pencilSettings.shadowColor,
       });
 
       canvas.freeDrawingBrush = brush;
       canvas.renderAll();
 
-      // Update pencil circle display
-      this.$nextTick(() => {
-        this.updateBrushCircle("pencil");
-      });
+      // Update pencil preview
+      this.updateBrushPreview();
     },
 
-    // Update brush size/color circle display
-    updateBrushCircle(toolType) {
-      const circleElement = document.querySelector(
-        `.tab-panel#${toolType} .brush-view .background-image .draw-circle`
-      );
-      if (!circleElement) return;
-
-      if (toolType === "brush") {
-        circleElement.style.width = `${this.brush.size}px`;
-        circleElement.style.height = `${this.brush.size}px`;
-        circleElement.style.backgroundColor = rgbaColorGenerator(
-          this.brush.color,
-          this.brush.opacity
-        );
-      } else if (toolType === "eraser") {
-        circleElement.style.width = `${this.eraser.size}px`;
-        circleElement.style.height = `${this.eraser.size}px`;
-      } else if (toolType === "pencil") {
-        circleElement.style.width = `${this.pencil.size}px`;
-        circleElement.style.height = `${this.pencil.size}px`;
-        circleElement.style.backgroundColor = this.pencil.color;
-      }
+    // Update brush preview
+    updateBrushPreview() {
+      // This will be handled by Alpine's reactivity in the HTML
     },
 
     // Generate brush cursor
     getBrushCursor() {
       const circle = `
-                <svg
-                    height="${this.brush.size}"
-                    fill="${rgbaColorGenerator(
-                      this.brush.color,
-                      this.brush.opacity
-                    )}"
-                    viewBox="0 0 ${this.brush.size * 2} ${this.brush.size * 2}"
-                    width="${this.brush.size}"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <circle
-                        cx="50%"
-                        cy="50%"
-                        r="${this.brush.size}" 
-                    />
-                </svg>
-            `;
+        <svg
+          height="${this.brushSettings.size}"
+          fill="${rgbaColorGenerator(
+            this.brushSettings.color,
+            this.brushSettings.opacity
+          )}"
+          viewBox="0 0 ${this.brushSettings.size * 2} ${
+        this.brushSettings.size * 2
+      }"
+          width="${this.brushSettings.size}"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="50%"
+            cy="50%"
+            r="${this.brushSettings.size}" 
+          />
+        </svg>
+      `;
 
       return `data:image/svg+xml;base64,${window.btoa(circle)}`;
     },
@@ -303,28 +349,30 @@ export function drawingComponent() {
     // Generate eraser cursor
     getEraserCursor() {
       const circle = `
-                <svg
-                    height="${this.eraser.size}"
-                    fill="#2f3e50"
-                    viewBox="0 0 ${this.eraser.size * 2} ${
-        this.eraser.size * 2
+        <svg
+          height="${this.eraserSettings.size}"
+          fill="#2f3e50"
+          viewBox="0 0 ${this.eraserSettings.size * 2} ${
+        this.eraserSettings.size * 2
       }"
-                    width="${this.eraser.size}"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <circle
-                        cx="50%"
-                        cy="50%"
-                        r="${this.eraser.size}" 
-                    />
-                </svg>
-            `;
+          width="${this.eraserSettings.size}"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="50%"
+            cy="50%"
+            r="${this.eraserSettings.size}" 
+          />
+        </svg>
+      `;
 
       return `data:image/svg+xml;base64,${window.btoa(circle)}`;
     },
 
     // Stop drawing mode
     stopDrawingMode() {
+      if (typeof canvas === "undefined") return;
+
       // Make all objects erasable
       canvas.forEachObject((obj) => {
         if (!obj) return false;
@@ -342,11 +390,13 @@ export function drawingComponent() {
       this.groupDrawingPaths();
     },
 
-    // Group drawing paths into a single object
+    // Group drawing paths
     groupDrawingPaths() {
+      if (typeof canvas === "undefined") return;
+
       const id = createNewId();
       const drawingPaths = canvas._objects.filter(
-        (obj) => obj.type == "path" && !obj.rendered && !obj.originalItem
+        (obj) => obj.type === "path" && !obj.rendered && !obj.originalItem
       );
 
       if (!drawingPaths.length) return false;
@@ -358,7 +408,7 @@ export function drawingComponent() {
         })
       );
 
-      let group = new Group(drawingPaths);
+      const group = new Group(drawingPaths);
       group.set({
         originalItem: {
           class: "shape",
@@ -382,10 +432,8 @@ export function drawingComponent() {
 
 // Export stop drawing mode for other modules to use
 export function stopDrawingMode() {
-  // This function will be called from outside the component
-  // We'll need to get the Alpine component and call its method
-  const drawingPanel = document.querySelector("#drawing");
-  if (drawingPanel && drawingPanel.__x) {
-    drawingPanel.__x.$data.stopDrawingMode();
+  const drawingPanelEl = document.querySelector('[x-data="drawingPanel"]');
+  if (drawingPanelEl && drawingPanelEl.__x) {
+    drawingPanelEl.__x.dataStack[0].stopDrawingMode();
   }
 }

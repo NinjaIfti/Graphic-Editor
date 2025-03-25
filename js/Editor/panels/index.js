@@ -119,6 +119,62 @@ export function panelManager() {
   };
 }
 
+// Stand-alone function for activating object properties panel (for backwards compatibility)
+export function activeObjPropsPanel(type) {
+  if (type === "curved-text") type = "text";
+
+  // Reset all property panels
+  const textPanel = document.querySelector(
+    `.cn-obj-editing-tools[data-type='text']`
+  );
+  const imagePanel = document.querySelector(
+    `.cn-obj-editing-tools[data-type='image']`
+  );
+  const shapePanel = document.querySelector(
+    `.cn-obj-editing-tools[data-type='shape']`
+  );
+
+  textPanel.classList.remove("active");
+  imagePanel.classList.remove("active");
+  shapePanel.classList.remove("active");
+
+  let panelType = type;
+
+  if (type === "text") {
+    textPanel.classList.add("active");
+  } else if (type === "image" || type === "shape") {
+    panelType = "uploads";
+
+    if (type === "image") {
+      imagePanel.classList.add("active");
+      QUICK_OPTIONS.crop(true);
+    } else {
+      shapePanel.classList.add("active");
+      QUICK_OPTIONS.crop(false);
+    }
+  }
+
+  QUICK_OPTIONS.delete(true);
+  QUICK_OPTIONS.alignment(true);
+
+  // Simulate click on the panel item
+  const panelItem = document.querySelector(
+    `.editor-sidebar .tool-item[data-type="${panelType}"]:not(.active)`
+  );
+  if (panelItem) {
+    // Create and dispatch a click event
+    const clickEvent = new Event("click", { bubbles: true });
+    panelItem.dispatchEvent(clickEvent);
+  }
+
+  // Also dispatch the change-tool event for Alpine.js components
+  window.dispatchEvent(
+    new CustomEvent("change-tool", {
+      detail: { type: panelType },
+    })
+  );
+}
+
 // Add item component for category panels
 export function categoryPanels() {
   return {
@@ -138,4 +194,58 @@ export function categoryPanels() {
       AddItemToEditor(item);
     },
   };
+}
+
+// Set up legacy jQuery event handlers if jQuery is available
+if (typeof window !== "undefined" && typeof window.$ !== "undefined") {
+  const $ = window.$;
+
+  // Tool Item click handler
+  $(document).on("click", ".editor-sidebar .tool-item", function () {
+    const type = $(this).attr("data-type") || $(this).data("type");
+    const $parent = $(".editor-sidebar-panels");
+    const $panel = $parent.find(`.single-panel#${type}`);
+
+    $parent.find(".single-panel").not($panel).removeClass("active");
+    $(".editor-sidebar .tool-item").not($(this)).removeClass("active");
+    $(this).toggleClass("active");
+    $panel.toggleClass("active");
+
+    // Drawing Event Listener
+    if (type === "drawing") {
+      $panel.find('.tab-btn[data-panel="brush"]').trigger("click"); // Active Brush Panel
+    } else {
+      stopDrawingMode();
+    }
+
+    // Dispatch event for Alpine.js components
+    window.dispatchEvent(
+      new CustomEvent("change-tool", {
+        detail: { type },
+      })
+    );
+  });
+
+  // Add Item to canvas - jQuery event handler for backward compatibility
+  $(document).on(
+    "click",
+    ".single-panel.category-panel .media-component .items .item",
+    function () {
+      const url = $(this).data("url");
+      const name = $(this).data("name");
+      const category = $(this).data("category");
+      const ext = getExtension(name);
+      const fileType = ext === "svg" ? "svg" : "image";
+      const type = category === "mask" ? "mask" : "image";
+
+      // add svg shape
+      const item = {
+        fileType: fileType,
+        src: url,
+        type,
+      };
+
+      AddItemToEditor(item); // Add Item To Editor
+    }
+  );
 }

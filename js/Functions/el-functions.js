@@ -1,99 +1,154 @@
-import $ from 'jquery';
-// #region Folding Card
+// js/Editor/Functions/el-functions.js
 
-// Toggle Folding Card
-function toggleFoldingCard($card) {
-    let $header = $card.find(".card-header"),
-        $body = $card.find('.card-body');
+// Alpine.js directives and components for UI elements
+document.addEventListener("alpine:init", () => {
+  // Folding Card Component
+  Alpine.data("foldingCard", () => ({
+    isOpen: false,
 
-    // Add Class
-    $header.toggleClass('active');
-    let slide = $header.hasClass('active') ? 'slideDown' : 'slideUp';
-    $body[slide](200);
-}
+    init() {
+      // Initialize the card (optionally start open based on data attribute)
+      this.isOpen = this.$el.getAttribute("data-open") === "true";
+    },
 
-// Toggle Folding Card 
-$(document).on('click', ".folding-card .card-header:not(:has(.switch-btn))", function (e) {
-    toggleFoldingCard($(this).parents(".folding-card"));
+    toggle() {
+      this.isOpen = !this.isOpen;
+    },
+  }));
+
+  // Horizontal Scroll Directive
+  Alpine.directive("horizontal-scroll", (el) => {
+    el.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      },
+      { passive: false }
+    );
+  });
+
+  // Dropdown Component
+  Alpine.data("editorDropdown", () => ({
+    isOpen: false,
+    selectedValue: "",
+    selectedHtml: "",
+
+    init() {
+      // Initialize with any pre-selected value
+      this.selectedValue = this.$el.getAttribute("value") || "";
+      const selectedItem = this.$el.querySelector(
+        `.menu .item[value="${this.selectedValue}"]`
+      );
+      if (selectedItem) {
+        this.selectedHtml = selectedItem.innerHTML;
+        selectedItem.classList.add("selected");
+      }
+
+      // Close dropdown when clicking outside
+      this.handleClickOutside = (event) => {
+        if (!this.$el.contains(event.target)) {
+          this.isOpen = false;
+        }
+      };
+
+      document.addEventListener("click", this.handleClickOutside);
+    },
+
+    toggle() {
+      this.isOpen = !this.isOpen;
+    },
+
+    selectItem(value, html, event) {
+      this.selectedValue = value;
+      this.selectedHtml = html;
+      this.isOpen = false;
+
+      // Remove selected class from all items
+      this.$el.querySelectorAll(".menu .item").forEach((item) => {
+        item.classList.remove("selected");
+      });
+
+      // Add selected class to clicked item
+      event.target.classList.add("selected");
+
+      // Set value attribute on dropdown
+      this.$el.setAttribute("value", value);
+
+      // Dispatch change event
+      this.$el.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+
+    // Clean up event listener
+    destroy() {
+      document.removeEventListener("click", this.handleClickOutside);
+    },
+  }));
+
+  // Input Sync Directive
+  Alpine.directive("sync", (el, { expression }) => {
+    el.addEventListener("input", () => {
+      const radius = el.getAttribute("data-radius") || "body";
+      const targetSelector = el.getAttribute("data-sync-with");
+
+      if (!targetSelector) return;
+
+      // Find the closest container with the radius
+      let container = el;
+      while (container && !container.matches(radius)) {
+        container = container.parentElement;
+      }
+
+      if (!container) return;
+
+      // Find the target element
+      const target = container.querySelector(targetSelector);
+      if (target) {
+        target.value = el.value;
+
+        // Also trigger Alpine.js reactivity if the target has x-model
+        if (target._x_model) {
+          target._x_model.set(el.value);
+        }
+      }
+    });
+  });
+
+  // Tabs Component
+  Alpine.data("navTabs", () => ({
+    activeTab: "",
+
+    init() {
+      // Initialize with the first tab or a specified default
+      const defaultTab = this.$el.getAttribute("data-default-tab");
+      const firstTabBtn = this.$el.querySelector(".tab-btn");
+
+      if (defaultTab) {
+        this.activeTab = defaultTab;
+      } else if (firstTabBtn) {
+        this.activeTab = firstTabBtn.getAttribute("data-panel");
+      }
+    },
+
+    setActiveTab(tabId) {
+      this.activeTab = tabId;
+    },
+  }));
 });
 
-// #endregion Folding Card
-
-
-// Enable Hr Dropdown
-$(document).ready(function () {
-
-    const targets = document.querySelectorAll("[data-horizontal-scroll='true']");
-    if (targets) {
-        Array.from(targets).forEach(target => {
-
-            target.addEventListener("wheel", function (e) {
-                e.preventDefault();
-                this.scrollLeft += e.deltaY;
-            }, { passive: false });
-
-        })
-    }
+// Initialize horizontal scroll on page load
+document.addEventListener("DOMContentLoaded", () => {
+  const targets = document.querySelectorAll('[data-horizontal-scroll="true"]');
+  if (targets) {
+    Array.from(targets).forEach((target) => {
+      target.addEventListener(
+        "wheel",
+        function (e) {
+          e.preventDefault();
+          this.scrollLeft += e.deltaY;
+        },
+        { passive: false }
+      );
+    });
+  }
 });
-
-//#region Editor Dropdown
-$(document).on("click", ".editor-dropdown .dropdown-toggle-item", function () {
-    let $dropdown = $(this).parents(".editor-dropdown").first();
-    $dropdown.toggleClass("active");
-});
-
-// On click on item
-$(document).on("click", ".editor-dropdown .dropdown-body .menu .item", function () {
-    let value = $(this).attr("value"),
-        html = $(this).clone().html(),
-        $parent = $(this).parents(".editor-dropdown");
-    $parent.attr("value", value);
-    $parent.find('.dropdown-toggle-item .item-html').html(html);
-    $parent.removeClass('active');
-
-    $parent.find('.menu .item').removeClass('selected');
-    $(this).addClass("selected");
-
-    $parent.trigger("change");
-});
-// Event Listner to close dropdown
-$(document).on("click", function (e) {
-    let $target = $(e.target);
-    if ($target.parents(".editor-dropdown").length) return false;
-    $('.editor-dropdown').removeClass("active");
-});
-
-//#endregion Editor Dropdown
-
-//#region Sync Inputs
-$(document).on("input", "[data-sync-with]", function () {
-    let radius = $(this).dataVal("radius", 'body'),
-        $target = $(this).parents(radius).find($(this).dataVal("sync-with")),
-        val = $(this).val();
-    $target.val(val);
-});
-
-//#endregion Sync Inputs 
-
-$(document).on("change", ".switch-btn .toggle-input", function (e) {
-    e.stopPropagation();
-    e.preventDefault();
-    let $card = $(this).parents(".folding-card"),
-        checked = $(this).is(":checked");
-    if ($card.length)
-        toggleFoldingCard($card);
-});
-
-//#region Nav Tabs
-$(document).on("click", ".nav-tabs .tab-items .tab-btn", function () {
-    let type = $(this).dataVal("panel"),
-        $parent = $(this).parents('.nav-tabs'),
-        $panel = $parent.find(`.tab-panels .tab-panel#${type}`);
-
-    $parent.find(".tab-panels .tab-panel").removeClass("active");
-    $(".nav-tabs .tab-items .tab-btn").removeClass("active")
-
-    $(this).addClass('active');
-    $panel.addClass('active');
-});
-//#endregion Nav Tabs

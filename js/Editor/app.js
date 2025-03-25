@@ -11,6 +11,7 @@ const CANVAS_OBJECT_DYNAMIC_KEYS = [
   "isPositioningLine",
   "name",
 ];
+
 const plugins = {
   CanvasGuides: true,
   ContextMenu: true,
@@ -20,7 +21,7 @@ const plugins = {
   RotationAngle: true,
 };
 
-// SVG Icons object - can be used by Alpine components
+// SVG Icons
 const SVG_ICONS = {
   times:
     "<svg width='17' height='17' fill='#000' xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 352 512\"><path d=\"M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z\"/></svg>",
@@ -50,49 +51,68 @@ const SVG_ICONS = {
     '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="m19.474 12.838 1.697.835a1 1 0 0 1 0 1.795L13.32 19.33a3 3 0 0 1-2.649 0L2.82 15.468a1 1 0 0 1 0-1.795l1.697-.835 1.698.836-1.821.896 6.94 3.415a1.5 1.5 0 0 0 1.324 0l6.94-3.415-1.822-.896 1.7-.836ZM13.32 4.673l7.852 3.864a1 1 0 0 1 0 1.794l-7.852 3.864a3 3 0 0 1-2.649 0L2.82 10.33a1 1 0 0 1 0-1.794l7.851-3.864a3 3 0 0 1 2.65 0Zm-1.986 8.176a1.5 1.5 0 0 0 1.324 0l6.94-3.415-6.94-3.415a1.5 1.5 0 0 0-1.324 0l-6.94 3.415 6.94 3.415Z"></path></svg>',
 };
 
-// Initialize the Alpine.js data and components
-document.addEventListener("alpine:init", () => {
-  // Create a global store for shared canvas state
+// Create the canvas - initialize here but wait for DOM to be ready
+let canvas = null;
+
+// Function to initialize canvas
+function initializeCanvas() {
+  // Only initialize if not already done
+  if (canvas) return canvas;
+
+  // Get canvas container dimensions
+  const canvasArea = document.querySelector(".canvas-area");
+  const width = canvasArea ? canvasArea.offsetWidth : window.innerWidth;
+  const height = canvasArea ? canvasArea.offsetHeight : window.innerHeight;
+
+  // Create new canvas
+  canvas = new Canvas("image-editor", {
+    preserveObjectStacking: true,
+    selectionKey: "ctrlKey",
+    selection: true,
+    width: width,
+    height: height,
+    backgroundColor: "#fff",
+  });
+
+  canvas.backgroundColor = "white";
+  canvas.renderAll();
+
+  return canvas;
+}
+
+// Wait for DOM content to load before initializing canvas
+document.addEventListener("DOMContentLoaded", () => {
+  initializeCanvas();
+
+  // Check if Alpine.js is available
+  if (window.Alpine) {
+    // Register Alpine.js components
+    registerAlpineComponents();
+  } else {
+    console.warn(
+      "Alpine.js is not loaded. Some features may not work correctly."
+    );
+  }
+});
+
+// Register Alpine.js components
+function registerAlpineComponents() {
+  // Create a global store for canvas state
   Alpine.store("editor", {
     canvas: null,
     selectedObject: null,
-    layers: [],
 
-    initialize() {
-      // We'll initialize the canvas when the DOM is ready
-      this.initializeCanvas();
+    init() {
+      this.canvas = canvas;
       this.setupEventListeners();
-    },
-
-    initializeCanvas() {
-      const canvasContainer = document.querySelector(".canvas-area");
-      const width = canvasContainer
-        ? canvasContainer.offsetWidth
-        : window.innerWidth;
-      const height = canvasContainer
-        ? canvasContainer.offsetHeight
-        : window.innerHeight;
-
-      this.canvas = new Canvas("image-editor", {
-        preserveObjectStacking: true,
-        selectionKey: "ctrlKey",
-        selection: true,
-        width: width,
-        height: height,
-        backgroundColor: "#fff",
-      });
-
-      this.canvas.backgroundColor = "white";
-      this.canvas.renderAll();
     },
 
     setupEventListeners() {
       if (!this.canvas) return;
 
-      // Basic selection event
+      // Selection events
       this.canvas.on("selection:created", (e) => {
         this.selectedObject = e.selected[0];
-        this.updateLayers();
       });
 
       this.canvas.on("selection:updated", (e) => {
@@ -102,31 +122,10 @@ document.addEventListener("alpine:init", () => {
       this.canvas.on("selection:cleared", () => {
         this.selectedObject = null;
       });
-
-      // More event listeners can be added here
-    },
-
-    updateLayers() {
-      // Update the layers array from canvas objects
-      if (!this.canvas) return;
-
-      this.layers = this.canvas.getObjects().map((obj) => {
-        return {
-          id: obj.id || this.generateUniqueId(),
-          name: obj.name || "Unnamed Layer",
-          type: obj.type,
-          visible: !obj.invisible,
-          object: obj,
-        };
-      });
-    },
-
-    generateUniqueId() {
-      return "layer-" + Math.random().toString(36).substring(2, 9);
     },
   });
 
-  // Context Menu Component
+  // Context menu component
   Alpine.data("contextMenu", () => ({
     isOpen: false,
     posX: 0,
@@ -136,9 +135,8 @@ document.addEventListener("alpine:init", () => {
     targetObject: null,
 
     init() {
-      // Setup event listeners for right click
+      // Setup right-click event listener
       document.addEventListener("contextmenu", (e) => {
-        const canvas = Alpine.store("editor").canvas;
         if (!canvas) return;
 
         // Check if click is on canvas
@@ -146,11 +144,11 @@ document.addEventListener("alpine:init", () => {
         if (canvasEl.contains(e.target)) {
           e.preventDefault();
 
-          // Get canvas coordinates
+          // Get canvas pointer position
           const pointer = canvas.getPointer(e);
           const objects = canvas.getObjects();
 
-          // Find object under cursor
+          // Find object under pointer
           const clickedObject = objects.find((obj) => {
             return canvas.containsPoint(e, obj);
           });
@@ -178,7 +176,6 @@ document.addEventListener("alpine:init", () => {
     },
 
     handleAction(action) {
-      const canvas = Alpine.store("editor").canvas;
       if (!canvas || !this.targetObject) return;
 
       switch (action) {
@@ -190,7 +187,6 @@ document.addEventListener("alpine:init", () => {
           break;
         case "delete":
           canvas.remove(this.targetObject);
-          Alpine.store("editor").updateLayers();
           break;
       }
 
@@ -204,12 +200,11 @@ document.addEventListener("alpine:init", () => {
       this.isLocked = !this.isLocked;
       this.targetObject.lockMovementX = this.isLocked;
       this.targetObject.lockMovementY = this.isLocked;
-      Alpine.store("editor").canvas.renderAll();
+      canvas.renderAll();
       this.close();
     },
 
     toggleGroup() {
-      const canvas = Alpine.store("editor").canvas;
       if (!canvas) return;
 
       if (this.isGrouped && this.targetObject) {
@@ -218,31 +213,136 @@ document.addEventListener("alpine:init", () => {
         this.targetObject.destroy();
         canvas.remove(this.targetObject);
         canvas.add(...items);
-        canvas.renderAll();
       } else if (canvas.getActiveObjects().length > 1) {
         // Group
-        const group = new fabric.Group(canvas.getActiveObjects());
+        const activeObjects = canvas.getActiveObjects();
+        const group = new fabric.Group(activeObjects);
         canvas.discardActiveObject();
-        canvas.remove(...group.getObjects());
+        canvas.remove(...activeObjects);
         canvas.add(group);
         canvas.setActiveObject(group);
-        canvas.renderAll();
       }
 
-      Alpine.store("editor").updateLayers();
+      canvas.renderAll();
       this.close();
     },
   }));
 
-  // Initialize other Alpine.js components here
+  // Quick options bar component
+  Alpine.data("quickOptionsBar", () => ({
+    hasSelection: false,
+    canCrop: false,
+    cropActive: false,
+
+    init() {
+      if (!canvas) return;
+
+      // Listen for selection changes
+      canvas.on("selection:created", (e) => {
+        this.hasSelection = true;
+        this.canCrop = e.selected[0]?.type === "image";
+      });
+
+      canvas.on("selection:cleared", () => {
+        this.hasSelection = false;
+        this.canCrop = false;
+      });
+    },
+
+    alignObjects(direction) {
+      if (!canvas) return;
+
+      const activeObj = canvas.getActiveObject();
+      if (!activeObj) return;
+
+      // Alignment logic will be implemented elsewhere
+      // This is just the UI handler
+      document.dispatchEvent(
+        new CustomEvent("align-objects", {
+          detail: { direction, object: activeObj },
+        })
+      );
+    },
+
+    startCrop() {
+      this.cropActive = true;
+      document.dispatchEvent(
+        new CustomEvent("start-crop", {
+          detail: { active: true },
+        })
+      );
+    },
+
+    applyCrop() {
+      this.cropActive = false;
+      document.dispatchEvent(
+        new CustomEvent("apply-crop", {
+          detail: { active: false },
+        })
+      );
+    },
+
+    resetCrop() {
+      this.cropActive = false;
+      document.dispatchEvent(
+        new CustomEvent("reset-crop", {
+          detail: { active: false },
+        })
+      );
+    },
+
+    deleteSelected() {
+      if (!canvas) return;
+
+      const activeObj = canvas.getActiveObject();
+      if (activeObj) {
+        canvas.remove(activeObj);
+        canvas.renderAll();
+        this.hasSelection = false;
+      }
+    },
+  }));
+
+  // Export tools component
+  Alpine.data("exportTools", () => ({
+    downloadCanvas(format) {
+      if (!canvas) return;
+
+      // Get current timestamp for filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const filename = `graphic-editor-${timestamp}.${format}`;
+
+      // Set export options
+      const exportOptions = {
+        format: format,
+        quality: 1,
+        multiplier: 2,
+      };
+
+      // Create download link
+      const dataURL = canvas.toDataURL(exportOptions);
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataURL;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    },
+  }));
+
+  // Initialize the Alpine store
+  Alpine.store("editor").init();
+}
+
+// Listen for window resize to update canvas dimensions
+window.addEventListener("resize", () => {
+  if (!canvas) return;
+
+  // Implement resize logic if needed
+  // This could preserve canvas content while changing dimensions
 });
 
-// Initialize Alpine store when DOM is loaded
-window.addEventListener("DOMContentLoaded", () => {
-  if (Alpine.store("editor")) {
-    Alpine.store("editor").initialize();
-  }
-});
-
-// Export constants for use in other modules if needed
-export { CANVAS_OBJECT_DYNAMIC_KEYS, plugins, SVG_ICONS };
+// Export the canvas and other constants
+export { canvas, plugins, SVG_ICONS, CANVAS_OBJECT_DYNAMIC_KEYS };

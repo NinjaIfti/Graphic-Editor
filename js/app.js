@@ -1,26 +1,21 @@
-import './Editor/Editor.js';
-import './Editor/color-picker.js';
-import jQuery from "jquery";
-window.$ = window.jQuery = jQuery;
-import { labelLayers } from "./Editor/panels/layers.js";
+import Alpine from "alpinejs";
+import { panelManager } from "./Editor/panels/index.js";
+import { textPanel, curvedTextPanel } from "./Editor/panels/text.js";
+import { layersPanel } from "./Editor/panels/layers.js";
+import { uploadsPanel } from "./Editor/panels/uploads.js";
+import { settingsPanel } from "./Editor/panels/settings.js";
+// Import other components
 
-let script = document.createElement("script");
-script.src = "./js/Libraries/jquery-ui.min.js";
-document.body.appendChild(script);
+window.Alpine = Alpine;
 
-script.onload = () => {
-    let $layers = $('.single-panel#layers .layers-con');
+// Register components
+Alpine.data("panelManager", panelManager);
+Alpine.data("textPanel", textPanel);
+Alpine.data("curvedTextPanel", curvedTextPanel);
+Alpine.data("layersPanel", layersPanel);
+Alpine.data("uploadsPanel", uploadsPanel);
+Alpine.data("settingsPanel", settingsPanel);
+// Register other components
 
-    // Make Layers Sortable
-    $layers.sortable({
-        axis: "y",
-        start: function (e, ui) {
-            ui.item.addClass("focused");
-        },
-        stop: function (e, ui) {
-            ui.item.removeClass("focused");
-            labelLayers();
-        }
-    });
-};
-
+// Initialize Alpine
+Alpine.start();
