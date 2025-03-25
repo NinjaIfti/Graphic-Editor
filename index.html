@@ -217,17 +217,18 @@
     <div class="flex h-[calc(100%-55px)]">
       <!--Sidebar wrapper-->
       <div class="flex gap-[10px]">
-        <!-- Mini Bar -->
+        <!-- Mini Bar with tool items -->
         <div
           class="bg-white flex flex-col max-w-[90px] py-4 pb-[10px] h-full relative justify-between z-[99] shadow-md border-t border-gray-300"
+          x-data="panelManager"
         >
           <!-- Items -->
           <div class="flex flex-col overflow-y-auto scrollbar-hide">
             <!-- Templates -->
             <div
-              x-data="{ active: true, type: 'templates' }"
-              @click="$dispatch('change-tool', { type: type }); active = true;"
-              :class="active ? 'bg-gray-100' : ''"
+              x-data="{ type: 'templates' }"
+              @click="activatePanel(type)"
+              :class="activePanel === 'templates' ? 'bg-gray-100' : ''"
               class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
             >
               <div class="mb-1">
@@ -250,9 +251,9 @@
 
             <!-- Uploads -->
             <div
-              x-data="{ active: false, type: 'uploads' }"
-              @click="$dispatch('change-tool', { type: type }); active = true;"
-              :class="active ? 'bg-gray-100' : ''"
+              x-data="{ type: 'uploads' }"
+              @click="activatePanel(type)"
+              :class="activePanel === 'uploads' ? 'bg-gray-100' : ''"
               class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
             >
               <div class="mb-1">
@@ -412,7 +413,7 @@
         >
           <!-- Templates -->
           <div
-            x-data="{ isActive: true }"
+            x-data="{ isActive: false }"
             x-show="isActive"
             @tool-changed.window="isActive = $event.detail.type === 'templates'"
             class="h-full flex flex-col"
@@ -469,7 +470,35 @@
                   class="grid grid-cols-2 md:grid-cols-3 gap-2"
                   id="file-upload-con"
                   x-show="uploads.length > 0"
-                ></div>
+                >
+                  <template x-for="upload in uploads" :key="upload.id">
+                    <div
+                      class="item relative rounded overflow-hidden border border-gray-200 group cursor-pointer"
+                      @click="addToCanvas(upload)"
+                    >
+                      <img
+                        :src="upload.src"
+                        :alt="upload.name"
+                        class="w-full h-full object-cover aspect-square"
+                      />
+                      <button
+                        @click.stop="deleteUpload(upload.id)"
+                        class="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 448 512"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.7 23.7 0 0 0 -21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0 -16-16z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </template>
+                </div>
                 <div
                   class="text-center text-gray-700 py-4"
                   x-show="uploads.length === 0"
@@ -478,7 +507,7 @@
                 </div>
               </div>
 
-              <!-- Image Tools -->
+              <!-- Image Tools - for image objects -->
               <div
                 x-show="selectedObject && selectedObject.type === 'image'"
                 class="space-y-4"
@@ -2049,12 +2078,12 @@
                 <!-- Canvas Size Dropdown -->
                 <div
                   x-data="{
-          open: false,
-          search: '',
-          selected: 'TikTok (1080x1920)',
-          value: '1080x1920',
-          filteredSizes: []
-        }"
+        open: false,
+        search: '',
+        selected: 'TikTok (1080x1920)',
+        value: '1080x1920',
+        filteredSizes: []
+      }"
                   class="relative"
                 >
                   <div
@@ -2173,6 +2202,25 @@
                     @input="updateBackgroundColor()"
                     class="w-full h-12 transform -translate-y-1"
                   />
+                </div>
+              </div>
+
+              <!-- Background Images (if applicable) -->
+              <div class="space-y-2" x-data="{ backgrounds: [] }">
+                <span class="text-sm font-medium">Background Images</span>
+                <div class="grid grid-cols-3 gap-2">
+                  <template x-for="bg in backgrounds" :key="bg.name">
+                    <div
+                      @click="setBackgroundImage(bg.src)"
+                      class="aspect-square cursor-pointer rounded border border-gray-200 overflow-hidden hover:border-blue-500"
+                    >
+                      <img
+                        :src="bg.src"
+                        :alt="bg.name"
+                        class="w-full h-full object-cover"
+                      />
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -2304,10 +2352,10 @@
             <!-- Panel Body -->
             <div class="flex-1 overflow-y-auto p-4">
               <!-- Media Component -->
-              <div class="grid grid-cols-3 gap-3">
+              <div class="grid grid-cols-3 gap-3" x-data="categoryPanels">
                 <!-- Clip Art Items -->
                 <div
-                  @click="addClipArt('./images/clip_arts/1.png')"
+                  @click="addItemToCanvas('./images/clip_arts/1.png', 'clip_art_1.png', 'clip_arts')"
                   class="aspect-square bg-gray-50 border border-gray-200 rounded overflow-hidden hover:border-blue-400 cursor-pointer transition"
                 >
                   <img
@@ -2318,7 +2366,7 @@
                 </div>
 
                 <div
-                  @click="addClipArt('./images/clip_arts/2.png')"
+                  @click="addItemToCanvas('./images/clip_arts/2.png', 'clip_art_2.png', 'clip_arts')"
                   class="aspect-square bg-gray-50 border border-gray-200 rounded overflow-hidden hover:border-blue-400 cursor-pointer transition"
                 >
                   <img
@@ -2329,7 +2377,7 @@
                 </div>
 
                 <div
-                  @click="addClipArt('./images/clip_arts/3.png')"
+                  @click="addItemToCanvas('./images/clip_arts/3.png', 'clip_art_3.png', 'clip_arts')"
                   class="aspect-square bg-gray-50 border border-gray-200 rounded overflow-hidden hover:border-blue-400 cursor-pointer transition"
                 >
                   <img

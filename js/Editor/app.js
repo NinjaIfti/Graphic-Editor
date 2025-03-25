@@ -1,3 +1,4 @@
+// js/Editor/app.js
 import { Canvas } from "fabric";
 
 // Constants

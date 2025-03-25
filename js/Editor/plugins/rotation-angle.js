@@ -5,7 +5,7 @@ const RotationState = {
   lastAngleRotation: null,
   currentAngle: null,
   isRotating: false,
-  cursorPos: new Point()
+  cursorPos: new Point(),
 };
 
 // Rotate Icon
@@ -34,7 +34,7 @@ function mouseRotateIcon(angle) {
       210: "7.825 8.672",
       225: "7.974 7.99",
       240: "8.383 7.332",
-      255: "8.83 6.441"
+      255: "8.83 6.441",
     },
     defaultPos = "7.25 10";
 
@@ -71,7 +71,6 @@ function mouseRotateIcon(angle) {
 function treatAngle(angle) {
   return angle - (angle % 15);
 }
-
 
 // Custom icon control
 const RotateIconSVG = encodeURIComponent(`
@@ -166,9 +165,6 @@ canvas.on("object:rotating", function (e) {
 canvas.on("after:render", function (opt) {
   RotationState.isRotating && renderRotateLabel(opt.ctx, canvas);
 });
-//#endregion Event Listeners 
+//#endregion Event Listeners
 
-
-export {
-  RotationState
-}
+export { RotationState };

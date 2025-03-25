@@ -1,191 +1,189 @@
-import $ from "jquery";
-import { canvas, SVG_ICONS } from '../app.js';
-import { getObjById, setActiveObject_ } from '../functions.js';
+// js/Editor/panels/layers.js
+import { canvas, SVG_ICONS } from "../app.js";
+import { getObjById, setActiveObject_ } from "../functions.js";
 
-let layers = [],
-    $layers = $('.single-panel#layers .layers-con'),
-    layerCount = 0;
+// Alpine.js component for layers panel
+export function layersPanel() {
+  return {
+    layers: [],
+    layerCount: 0,
+    selectedLayerId: null,
 
-// Get Layer HTML
-const getLayerHTML = (item, isSubLayer = false) => {
-    if (!item) return '';
+    init() {
+      // Initialize component
+      this.refreshLayers();
 
-    let image = item.src,
-        imageTag = '',
-        subLayers = '',
-        subLayerBtn = '',
-        type = item.class;
+      // Set up canvas event listeners
+      if (typeof canvas !== "undefined") {
+        canvas.on("object:added", this.refreshLayers.bind(this));
+        canvas.on("object:removed", this.refreshLayers.bind(this));
+        canvas.on("selection:created", this.handleSelectionCreated.bind(this));
+        canvas.on("selection:updated", this.handleSelectionCreated.bind(this));
+        canvas.on("selection:cleared", () => {
+          this.selectedLayerId = null;
+        });
+      }
+    },
 
-    if (type == 'image' || type == "shape" && item.type !== 'drawing')
-        imageTag = `<img src="${image}" alt="img" class="layer-img">`;
-    else if (type == 'text')
-        imageTag = `<i class="layer-icon">${SVG_ICONS.text}</i>`;
-    else if (item.type == 'group') {
-        imageTag = `<i class="layer-icon sub-layer-toggle cp">${SVG_ICONS.folder}</i>`;
-        subLayers = '<div class="sub-layers">' + subLayersData(item.id) + '</div>';
-    }
+    handleSelectionCreated() {
+      const obj = canvas.getActiveObject();
+      if (obj && obj.id) {
+        this.selectedLayerId = obj.id;
+      }
+    },
 
-    else if (item.type == 'drawing')
-        imageTag = `<i class="layer-icon">${SVG_ICONS.drawing}</i>`;
-    if (!isSubLayer) layers.unshift(item.id);
+    refreshLayers() {
+      // Reset layers array and counter
+      this.layers = [];
+      this.layerCount = 0;
 
-    // Layer HTML
-    let layer = `<div class="single-layer" data-id="${item.id}" data-type="${type}">
-                    <div class="layer-content">
-                        <div class="left-side">
-                            ${imageTag}
-                            <span class="title">Layer ${++layerCount}</span>
-                        </div>
-                        <div class="right-side">
-                            <span class="action-btn" data-type="object-view" data-view="true"><span class="view">${SVG_ICONS["eye-open"]}</span><span class="hide">${SVG_ICONS["eye-close"]}</span></span>
-                            <span class="action-btn" data-type="delete">${SVG_ICONS['trash-alt']}</span>
-                        </div>
-                    </div>
-
-                    ${subLayers}
-                </div>`;
-    return layer;
-}
-
-// sub layers fn
-function subLayersData(groupId) {
-    let group = getObjById(groupId),
-        subLayersHTML = '';
-    if (!group) return subLayersHTML;
-    group._objects.forEach(obj => {
-        if (obj.originalItem) {
-            // layer
-            subLayersHTML += getLayerHTML(obj.originalItem, true)
+      // Get all objects from canvas
+      if (typeof canvas !== "undefined") {
+        const canvasObjects = canvas.getObjects();
+        // Process in reverse order to match stacking (top to bottom)
+        for (let i = canvasObjects.length - 1; i >= 0; i--) {
+          const obj = canvasObjects[i];
+          if (obj.originalItem) {
+            this.addLayerToArray(obj);
+          }
         }
-    });
-    return subLayersHTML;
-}
+      }
+    },
 
-// Add Layer fn 
-const addLayer = (objId) => {
-    let obj = getObjById(objId);
-    if (!obj) return false;
-    if ($layers.find(`.single-layer[data-id="${obj.id}"]`).length) return false;
-    let layerHTML = getLayerHTML(obj.originalItem);
-    $layers.prepend(layerHTML);
-};
+    addLayerToArray(obj) {
+      if (!obj || !obj.originalItem) return;
 
-// Label Layers according to the layers pattern
-function labelLayers(new_layers_pattren = null) {
-    if (new_layers_pattren === null) {
-        new_layers_pattren = [];
-        $layers.find(".single-layer").each(function () {
-            new_layers_pattren.push($(this).attr('data-id'));
+      const item = obj.originalItem;
+      const layerObj = {
+        id: obj.id,
+        name: `Layer ${++this.layerCount}`,
+        type: item.class || item.type,
+        visible: obj.opacity !== 0,
+        isGroup: item.type === "group",
+        src: item.src,
+        icon: this.getLayerIcon(item),
+        subLayers: [],
+      };
+
+      // Handle group objects and their sublayers
+      if (item.type === "group" && obj._objects) {
+        obj._objects.forEach((subObj) => {
+          if (subObj.originalItem) {
+            // Recursively add sublayers
+            layerObj.subLayers.push(this.createSubLayer(subObj));
+          }
         });
-    }
+      }
 
+      this.layers.push(layerObj);
+    },
 
-    let new_indexes = [];
-    layers.forEach(function (l_id, i) {
-        let old_index = i,
-            new_index = new_layers_pattren.indexOf(l_id),
-            move_index = old_index - new_index;
-        if (move_index < 0) {
-            new_indexes.push({
-                layer_id: l_id,
-                move_index: move_index
-            });
+    createSubLayer(obj) {
+      if (!obj || !obj.originalItem) return null;
+
+      const item = obj.originalItem;
+      return {
+        id: obj.id,
+        name: `Sublayer ${++this.layerCount}`,
+        type: item.class || item.type,
+        visible: obj.opacity !== 0,
+        src: item.src,
+        icon: this.getLayerIcon(item),
+      };
+    },
+
+    getLayerIcon(item) {
+      const type = item.class || item.type;
+
+      if (type === "image" || (type === "shape" && item.type !== "drawing")) {
+        return "image";
+      } else if (type === "text") {
+        return "text";
+      } else if (item.type === "group") {
+        return "folder";
+      } else if (item.type === "drawing") {
+        return "drawing";
+      }
+
+      return "default";
+    },
+
+    selectLayer(layer) {
+      if (!layer) return;
+
+      this.selectedLayerId = layer.id;
+      const obj = getObjById(layer.id);
+      if (obj) {
+        setActiveObject_(obj);
+      }
+    },
+
+    toggleLayerVisibility(layer) {
+      if (!layer) return;
+
+      layer.visible = !layer.visible;
+      const opacityVal = layer.visible ? 1 : 0;
+
+      canvas.getObjects().forEach((obj) => {
+        if (obj.id === layer.id) {
+          obj.set("opacity", opacityVal);
+          canvas.requestRenderAll();
         }
-    });
-    // Set New Layers to editor objects
-    for (let i = new_indexes.length - 1; i >= 0; i--) {
-        canvas.forEachObject((obj) => {
-            if (obj.id == new_indexes[i].layer_id) {
-                for (let j = new_indexes[i].move_index; j < 0; j++) {
-                    canvas.sendObjectToBack(obj);
-                }
-            }
+      });
+    },
+
+    deleteLayer(layer) {
+      if (!layer) return;
+
+      const obj = getObjById(layer.id);
+      if (!obj) return;
+
+      // If it's a group, remove all objects in the group
+      if (obj._objects) {
+        obj._objects.forEach((groupObj) => {
+          canvas.remove(groupObj);
         });
-    }
-    canvas.requestRenderAll();
-    layers = new_layers_pattren;
-}
+      }
 
-// Active layer object
-function activeLayerObj(objId) {
-    $layers.find(".single-layer").removeClass("active");
-    $layers.find(`.single-layer[data-id="${objId}"]`).addClass("active");
-    let obj = getObjById(objId);
-    if (!obj) return false;
-    setActiveObject_(obj);
-}
+      canvas.remove(obj);
+      canvas.requestRenderAll();
 
-// layer reload
-function layerReload() {
-    $layers.html('');
-    // canvas objects
-    layers = [];
-    canvas.forEachObject(obj => {
-        if (obj.originalItem) addLayer(obj.id);
-    });
-}
+      // Refresh layers
+      this.refreshLayers();
+    },
 
-// Active Layer
-$(document).on("click", ".single-layer", function () {
-    $(this).toggleClass('active');
-    let id = $(this).dataVal("id"),
-        obj = getObjById(id);
-    if (!obj) return false;
-    setActiveObject_(obj);
-});
+    moveLayerUp(index) {
+      if (index <= 0 || index >= this.layers.length) return;
 
+      const layerId = this.layers[index].id;
+      const obj = getObjById(layerId);
+      if (!obj) return;
 
-// object hide and show
-$(document).on('click', ".single-layer .action-btn[data-type='object-view'][data-view='true']", function (e) {
-    e.stopPropagation();
-    e.preventDefault();
-    let $parent = $(this).parents(".single-layer"),
-        targetId = $parent.attr('data-id');
-    $(this).toggleClass("active");
+      // Move object forward in canvas
+      canvas.bringForward(obj);
+      canvas.requestRenderAll();
 
-    let opacityVal = $(this).hasClass("active") ? 0 : 1;
-    canvas.forEachObject(obj => {
-        if (targetId == obj.id)
-            obj.set("opacity", opacityVal);
+      // Update layers array
+      const temp = this.layers[index];
+      this.layers[index] = this.layers[index - 1];
+      this.layers[index - 1] = temp;
+    },
 
-        canvas.requestRenderAll();
-    });
-});
+    moveLayerDown(index) {
+      if (index < 0 || index >= this.layers.length - 1) return;
 
-// Delete Object
-$(document).on('click', ".single-layer .action-btn[data-type='delete']", function (e) {
-    e.stopPropagation();
-    e.preventDefault();
-    let $layer = $(this).parents(".single-layer").first(),
-        id = $layer.dataVal("id"),
-        obj = getObjById(id);
+      const layerId = this.layers[index].id;
+      const obj = getObjById(layerId);
+      if (!obj) return;
 
-    if (obj._objects)
-        obj._objects.forEach(obj => {
-            canvas.remove(obj);
-        });
+      // Move object backward in canvas
+      canvas.sendBackwards(obj);
+      canvas.requestRenderAll();
 
-    canvas.remove(obj);
-    $layer.remove();
-});
-
-// Active Object on layer active
-$layers.find('.single-layer').on('click', function () {
-    let layerId = $(this).dataVal("id");
-    activeLayerObj(layerId);
-});
-
-// sub layer shows 
-$(document).on('click', ".single-layer .layer-content .sub-layer-toggle", function (e) {
-    console.log('clicking');
-    e.stopPropagation();
-    let $parent = $(this).parents('.single-layer').first();
-    $parent.find('.sub-layers').toggleClass("active");
-});
-
-
-export {
-    labelLayers,
-    addLayer,
-    layerReload
+      // Update layers array
+      const temp = this.layers[index];
+      this.layers[index] = this.layers[index + 1];
+      this.layers[index + 1] = temp;
+    },
+  };
 }
