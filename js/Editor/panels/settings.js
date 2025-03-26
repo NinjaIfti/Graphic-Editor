@@ -2,6 +2,7 @@
 import { AddItemToEditor } from "../Editor.js";
 import { canvas } from "../app.js";
 import { resizeCanvas } from "../plugins/aspect-ratio.js";
+import Alpine from "alpinejs";
 
 // Alpine.js component for settings panel
 export function settingsPanel() {

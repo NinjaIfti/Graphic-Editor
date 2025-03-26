@@ -1,6 +1,8 @@
 // js/Editor/panels/drawing.js
 import * as fabric from "fabric";
 import { PencilBrush, PatternBrush, Shadow, Rect, Group } from "fabric";
+import Alpine from "alpinejs";
+
 // Replace the @erase2d/fabric import with a custom implementation
 import {
   rgbaColorGenerator,

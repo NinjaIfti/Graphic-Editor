@@ -1,6 +1,7 @@
 // js/Editor/quick-options.js
 import { canvas } from "./app.js";
 import { alignmentObject } from "./plugins/alignment.js";
+import Alpine from "alpinejs";
 
 // Create an Alpine.js compatible structure for Quick Options
 const QUICK_OPTIONS = {

@@ -3,6 +3,7 @@ import { Line } from "fabric";
 import { canvas } from "../app.js";
 import { canvasDimensions } from "./aspect-ratio.js";
 import { isObjInGroup, createNewId } from "../functions.js";
+import Alpine from "alpinejs";
 
 // Add positioning line
 function showPositioningLine(type, point, props) {

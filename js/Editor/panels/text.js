@@ -1,6 +1,7 @@
 // js/Editor/panels/text.js
 import { canvas } from "../app.js";
 import { AddItemToEditor } from "../Editor.js";
+import Alpine from "alpinejs";
 
 // Alpine.js component for text panel
 export function textPanel() {
@@ -284,7 +285,6 @@ export function curvedTextPanel() {
       // For example:
       // obj.set('radius', calculateRadius(this.curveAngle));
       // canvas.renderAll();
-      
     },
   };
 }

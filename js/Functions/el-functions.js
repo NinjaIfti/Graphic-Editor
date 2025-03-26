@@ -1,4 +1,5 @@
 // js/Editor/Functions/el-functions.js
+import Alpine from "alpinejs";
 
 // Alpine.js directives and components for UI elements
 document.addEventListener("alpine:init", () => {

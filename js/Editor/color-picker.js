@@ -1,5 +1,5 @@
 // js/color-picker.js - Alpine.js version
-
+import Alpine from "alpinejs";
 import { getRand } from "../Functions/functions.js";
 
 // Setup color picker functionality

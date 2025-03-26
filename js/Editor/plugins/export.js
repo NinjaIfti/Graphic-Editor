@@ -1,6 +1,7 @@
 // js/Editor/plugins/export.js
 import { startDownloadCanvas, finishDownloadCanvas } from "./aspect-ratio.js";
 import { canvas } from "../app.js";
+import Alpine from "alpinejs";
 
 // Export canvas
 function exportCanvasFile(type, options = {}) {

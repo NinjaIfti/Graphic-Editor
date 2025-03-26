@@ -3,6 +3,7 @@ import { AddItemToEditor } from "../Editor.js";
 import { stopDrawingMode } from "./drawing.js";
 import { QUICK_OPTIONS } from "../quick-options.js";
 import { getExtension } from "../../Functions/functions.js";
+import Alpine from "alpinejs";
 
 // Main Alpine.js component for panel management
 export function panelManager() {

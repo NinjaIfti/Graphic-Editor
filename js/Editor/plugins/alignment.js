@@ -1,6 +1,7 @@
 // js/Editor/plugins/alignment.js
 import { canvas } from "../app.js";
 import { canvasDimensions } from "./aspect-ratio.js";
+import Alpine from "alpinejs";
 
 let activeGroupPosition = {};
 

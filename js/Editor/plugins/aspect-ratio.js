@@ -1,5 +1,4 @@
-// js/Editor/plugins/aspect-ratio.js
-import { canvas } from "../app.js";
+import Alpine from "alpinejs";
 
 // Get Ratio
 function getRatio(width, height) {
@@ -35,7 +34,7 @@ function getMissingValue(dimensions, ratio) {
 // Initialize canvas dimensions
 let canvasDimensions = {};
 
-function initCanvasDimensions() {
+function initCanvasDimensions(canvas) {
   canvasDimensions = {
     orgWidth: canvas.getWidth(),
     orgHeight: canvas.getHeight(),
@@ -47,7 +46,6 @@ function initCanvasDimensions() {
     defaultZoom: canvas.getZoom(),
   };
 
-  // Notify Alpine components about canvas dimensions
   document.dispatchEvent(
     new CustomEvent("canvas-dimensions-updated", {
       detail: {
@@ -57,13 +55,8 @@ function initCanvasDimensions() {
   );
 }
 
-// Initialize when DOM is ready
-document.addEventListener("DOMContentLoaded", () => {
-  initCanvasDimensions();
-});
-
 // Resize Canvas
-function resizeCanvas(data) {
+function resizeCanvas(canvas, data) {
   let isZoomResized = data.isZoomResized || false,
     width = parseInt(data.width),
     height = parseInt(data.height),
@@ -84,7 +77,6 @@ function resizeCanvas(data) {
     zoomPercentage = (decreaseImagePercentage / 100) * 1;
 
   console.log(newWidth, newHeight);
-  // Set Canvas Dimensions Val
   canvasDimensions.resizedWidth = width;
   canvasDimensions.resizedHeight = height;
   canvasDimensions.adjustedWidth = newWidth;
@@ -92,13 +84,11 @@ function resizeCanvas(data) {
   canvasDimensions.zoom = zoomPercentage;
   if (!isZoomResized) canvasDimensions.defaultZoom = zoomPercentage;
 
-  // Set Properties
   canvas.setZoom(zoomPercentage);
   canvas.setWidth(newWidth);
   canvas.setHeight(newHeight);
   canvas.renderAll();
 
-  // Notify Alpine components about canvas dimensions change
   document.dispatchEvent(
     new CustomEvent("canvas-dimensions-updated", {
       detail: {
@@ -110,6 +100,7 @@ function resizeCanvas(data) {
 
 // Load Image to canvas as window
 function loadImageInCavnasAsWindow(
+  canvas,
   imgSrc,
   properties = {},
   { createNewId, addLayer, saveHistory, originalItems } = {}
@@ -136,12 +127,10 @@ function loadImageInCavnasAsWindow(
   };
 
   img.onload = function () {
-    // Load image to canvas
     let fImage = new fabric.Image(img);
-
     fImage.set(properties);
     canvas.add(fImage);
-    resizeCanvas({
+    resizeCanvas(canvas, {
       width: img.width,
       height: img.height,
     });
@@ -155,7 +144,6 @@ function loadImageInCavnasAsWindow(
     });
     saveHistory();
 
-    // Notify Alpine components about the new image
     document.dispatchEvent(
       new CustomEvent("image-loaded-as-window", {
         detail: {
@@ -167,7 +155,7 @@ function loadImageInCavnasAsWindow(
 }
 
 // Resize canvas when downloading
-function startDownloadCanvas() {
+function startDownloadCanvas(canvas) {
   let zoom = canvas.getZoom();
   canvasDimensions.tmpZoom = zoom;
   canvas.setWidth(canvasDimensions.resizedWidth);
@@ -175,17 +163,15 @@ function startDownloadCanvas() {
   canvas.setZoom(1);
   canvas.renderAll();
 
-  // Notify Alpine components about download start
   document.dispatchEvent(new CustomEvent("download-canvas-start"));
 }
 
-function finishDownloadCanvas() {
+function finishDownloadCanvas(canvas) {
   canvas.setZoom(canvasDimensions.tmpZoom);
   canvas.setWidth(canvasDimensions.adjustedWidth);
   canvas.setHeight(canvasDimensions.adjustedHeight);
   canvas.renderAll();
 
-  // Notify Alpine components about download finish
   document.dispatchEvent(new CustomEvent("download-canvas-finish"));
 }
 
@@ -211,24 +197,9 @@ document.addEventListener("alpine:init", () => {
       document.addEventListener("change-tool", (e) => {
         this.isActive = e.detail.type === "settings";
       });
-
-      document.addEventListener("canvas-dimensions-updated", (e) => {
-        // Update any dimensions in our panel if needed
-      });
     },
 
-    filterSizes() {
-      if (!this.search) {
-        this.filteredSizes = this.canvasSizes;
-        return;
-      }
-
-      this.filteredSizes = this.canvasSizes.filter((size) =>
-        size.name.toLowerCase().includes(this.search.toLowerCase())
-      );
-    },
-
-    selectSize(size) {
+    selectSize(canvas, size) {
       this.selected = size.name;
       this.value = size.value;
 
@@ -238,27 +209,19 @@ document.addEventListener("alpine:init", () => {
       }
 
       this.customSizeVisible = false;
-
-      // Parse dimensions from value (e.g., "1080x1920")
       const [width, height] = size.value.split("x").map(Number);
-
-      // Apply canvas resize
-      resizeCanvas({
-        width,
-        height,
-      });
+      resizeCanvas(canvas, { width, height });
     },
 
-    applyCustomSize() {
+    applyCustomSize(canvas) {
       if (!this.customWidth || !this.customHeight) return;
-
-      resizeCanvas({
+      resizeCanvas(canvas, {
         width: this.customWidth,
         height: this.customHeight,
       });
     },
 
-    updateBackgroundColor() {
+    updateBackgroundColor(canvas) {
       canvas.setBackgroundColor(this.backgroundColor, () => {
         canvas.renderAll();
       });
@@ -268,6 +231,7 @@ document.addEventListener("alpine:init", () => {
 
 export {
   canvasDimensions,
+  initCanvasDimensions,
   resizeCanvas,
   startDownloadCanvas,
   finishDownloadCanvas,

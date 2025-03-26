@@ -31,19 +31,26 @@ import { addLayer } from "./panels/layers.js";
 import "./panels/index.js";
 
 // Initialize fabric canvas
-let canvas;
 let plugins = {};
 
-// Initialize the editor when DOM is ready
-document.addEventListener("DOMContentLoaded", () => {
+// Initialize the canvas
+let canvas = null;
+
+export function initializeCanvas(width, height) {
   canvas = new fabric.Canvas("image-editor", {
     preserveObjectStacking: true,
-    // Add other canvas options as needed
+    selectionKey: "ctrlKey",
+    selection: true,
+    width: width,
+    height: height,
+    backgroundColor: "#fff",
   });
 
-  // Setup canvas events
-  setupCanvasEvents();
-});
+  canvas.backgroundColor = "white";
+  canvas.renderAll();
+
+  return canvas;
+}
 
 function setupCanvasEvents() {
   // Mouse Up Event
@@ -200,4 +207,10 @@ function addItemToEditorCallback(objId) {
 }
 
 // Export for use in other modules
-export { canvas, plugins, addItemToEditorCallback, AddItemToEditor };
+export {
+  canvas,
+  plugins,
+  addItemToEditorCallback,
+  AddItemToEditor,
+  setupCanvasEvents,
+};

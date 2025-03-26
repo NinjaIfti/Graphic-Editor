@@ -1,4 +1,6 @@
 // js/Editor/plugins/context-menu.js
+import Alpine from "alpinejs";
+
 import { canvas } from "../app.js";
 import { toBoolean } from "../../Functions/functions.js";
 import {

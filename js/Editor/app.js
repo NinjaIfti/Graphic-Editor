@@ -1,5 +1,48 @@
 // js/Editor/app.js
 import { Canvas } from "fabric";
+import Alpine from "alpinejs";
+import {
+  panelManager,
+  activeObjPropsPanel,
+  categoryPanels,
+} from "./panels/index.js";
+import { textPanel, curvedTextPanel } from "./panels/text.js";
+import {
+  layersPanel,
+  addLayer,
+  layerReload,
+  labelLayers,
+} from "./panels/layers.js";
+import { uploadsPanel } from "./panels/uploads.js";
+import { settingsPanel } from "./panels/settings.js";
+import {
+  AddItemToEditor,
+  addItemToEditorCallback,
+  initializeCanvas,
+  plugins,
+  canvas,
+} from "./Editor.js";
+import { drawingPanel, stopDrawingMode } from "./panels/drawing.js";
+import { CanvasGuides } from "./plugins/canvas-guides.js";
+
+console.log("Alpine", Alpine);
+
+// Register components
+Alpine.data("panelManager", panelManager);
+Alpine.data("textPanel", textPanel);
+Alpine.data("curvedTextPanel", curvedTextPanel);
+Alpine.data("layersPanel", layersPanel);
+Alpine.data("uploadsPanel", uploadsPanel);
+Alpine.data("settingsPanel", settingsPanel);
+Alpine.data("drawingPanel", drawingPanel);
+Alpine.data("stopDrawingMode", stopDrawingMode);
+Alpine.data("AddItemToEditor", AddItemToEditor);
+Alpine.data("addItemToEditorCallback", addItemToEditorCallback);
+Alpine.data("addLayer", addLayer);
+Alpine.data("layerReload", layerReload);
+Alpine.data("labelLayers", labelLayers);
+Alpine.data("categoryPanels", categoryPanels);
+Alpine.data("activeObjPropsPanel", activeObjPropsPanel);
 
 // Constants
 const CANVAS_OBJECT_DYNAMIC_KEYS = [
@@ -11,15 +54,6 @@ const CANVAS_OBJECT_DYNAMIC_KEYS = [
   "isPositioningLine",
   "name",
 ];
-
-const plugins = {
-  CanvasGuides: true,
-  ContextMenu: true,
-  Crop: true,
-  CurveText: false,
-  Filters: false,
-  RotationAngle: true,
-};
 
 // SVG Icons
 const SVG_ICONS = {
@@ -50,60 +84,13 @@ const SVG_ICONS = {
   layers:
     '<svg width=\'17\' height=\'17\' fill=\'#000\' xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="m19.474 12.838 1.697.835a1 1 0 0 1 0 1.795L13.32 19.33a3 3 0 0 1-2.649 0L2.82 15.468a1 1 0 0 1 0-1.795l1.697-.835 1.698.836-1.821.896 6.94 3.415a1.5 1.5 0 0 0 1.324 0l6.94-3.415-1.822-.896 1.7-.836ZM13.32 4.673l7.852 3.864a1 1 0 0 1 0 1.794l-7.852 3.864a3 3 0 0 1-2.649 0L2.82 10.33a1 1 0 0 1 0-1.794l7.851-3.864a3 3 0 0 1 2.65 0Zm-1.986 8.176a1.5 1.5 0 0 0 1.324 0l6.94-3.415-6.94-3.415a1.5 1.5 0 0 0-1.324 0l-6.94 3.415 6.94 3.415Z"></path></svg>',
 };
-
-// Create the canvas - initialize here but wait for DOM to be ready
-let canvas = null;
-
-// Function to initialize canvas
-function initializeCanvas() {
-  // Only initialize if not already done
-  if (canvas) return canvas;
-
-  // Get canvas container dimensions
-  const canvasArea = document.querySelector(".canvas-area");
-  const width = canvasArea ? canvasArea.offsetWidth : window.innerWidth;
-  const height = canvasArea ? canvasArea.offsetHeight : window.innerHeight;
-
-  // Create new canvas
-  canvas = new Canvas("image-editor", {
-    preserveObjectStacking: true,
-    selectionKey: "ctrlKey",
-    selection: true,
-    width: width,
-    height: height,
-    backgroundColor: "#fff",
-  });
-
-  canvas.backgroundColor = "white";
-  canvas.renderAll();
-
-  return canvas;
-}
-
-// Wait for DOM content to load before initializing canvas
-document.addEventListener("DOMContentLoaded", () => {
-  initializeCanvas();
-
-  // Check if Alpine.js is available
-  if (window.Alpine) {
-    // Register Alpine.js components
-    registerAlpineComponents();
-  } else {
-    console.warn(
-      "Alpine.js is not loaded. Some features may not work correctly."
-    );
-  }
-});
-
 // Register Alpine.js components
 function registerAlpineComponents() {
   // Create a global store for canvas state
-  Alpine.store("editor", {
-    canvas: null,
-    selectedObject: null,
-
+  window.Alpine.store("editor", {
     init() {
       this.canvas = canvas;
+      console.log("Canvas", this.canvas);
       this.setupEventListeners();
     },
 
@@ -335,6 +322,20 @@ function registerAlpineComponents() {
   // Initialize the Alpine store
   Alpine.store("editor").init();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const canvasArea = document.querySelector(".canvas-area");
+  const width = canvasArea ? canvasArea.offsetWidth : window.innerWidth;
+  const height = canvasArea ? canvasArea.offsetHeight : window.innerHeight;
+
+  // Initialize the canvas
+  initializeCanvas(width, height);
+
+  console.log("Canvas: ", canvas);
+  // Register Alpine components and start Alpine
+  registerAlpineComponents();
+  Alpine.start();
+});
 
 // Listen for window resize to update canvas dimensions
 window.addEventListener("resize", () => {

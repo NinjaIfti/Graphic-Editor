@@ -1,3 +1,5 @@
+import Alpine from "alpinejs";
+
 // js/Editor/panels/uploads.js
 import { SVG_ICONS } from "../app.js";
 import {

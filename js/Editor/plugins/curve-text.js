@@ -2,6 +2,7 @@
 import * as fabric from "fabric";
 import { Textbox } from "fabric";
 import { canvas } from "../app.js";
+import Alpine from "alpinejs";
 
 class CurvedText extends Textbox {
   static type = "curved-text";

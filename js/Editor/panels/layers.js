@@ -1,6 +1,7 @@
 // js/Editor/panels/layers.js
 import { canvas, SVG_ICONS } from "../app.js";
 import { getObjById, setActiveObject_ } from "../functions.js";
+import Alpine from "alpinejs";
 
 // Store layer state for compatibility with legacy code
 let layers = [];
@@ -215,7 +216,8 @@ export function layersPanel() {
   };
 }
 
-// Legacy functions for backward compatibility
+// Legacy 
+// s for backward compatibility
 
 // Add layer function for use with existing code
 export function addLayer(objId) {
