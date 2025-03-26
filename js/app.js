@@ -11,24 +11,13 @@ function initCanvas() {
   // Create canvas instance
   const canvas = new fabric.Canvas("image-editor", {
     preserveObjectStacking: true,
-    width: 800,
-    height: 600,
+    width: document.getElementById("image-editor").clientWidth,
+    height: document.getElementById("image-editor").clientHeight,
     backgroundColor: "#ffffff",
   });
 
   // Make it globally available
   window.canvas = canvas;
-
-  // Set up event listeners
-  canvas.on("selection:created", handleSelection);
-  canvas.on("selection:updated", handleSelection);
-  canvas.on("selection:cleared", handleSelectionCleared);
-  canvas.on("object:modified", handleObjectModified);
-  canvas.on("object:added", handleObjectAdded);
-  canvas.on("object:removed", handleObjectRemoved);
-
-  // Initialize history stack for undo/redo
-  initHistory();
 
   // Add a few demo objects
   const welcomeText = new fabric.Text("Welcome to Steve Editor", {
@@ -37,20 +26,14 @@ function initCanvas() {
     fill: "#333333",
     left: 400,
     top: 100,
-  });
-
-  const rectangle = new fabric.Rect({
-    width: 200,
-    height: 150,
-    fill: "#ff5555",
-    left: 300,
-    top: 300,
-    rx: 10,
-    ry: 10,
+    editable: true,
+    selectable: true,
+    hasControls: true,
+    clickable: true,
+    hoverCursor: "pointer",
   });
 
   canvas.add(welcomeText);
-  canvas.add(rectangle);
   canvas.centerObject(welcomeText);
 
   // Notify other components that canvas is ready
@@ -67,16 +50,27 @@ document.addEventListener("alpine:init", () => {
   Alpine.data("steveEditor", () => ({
     activeTool: "templates", // Default active tool
 
-    // Initialize the main canvas
-
     init() {
-      // Listen for tool changes from sidebar
+      // Set up canvas event listeners if canvas exists
+      if (window.canvas) {
+        window.canvas.on("selection:created", this.handleSelection);
+        window.canvas.on("selection:updated", this.handleSelection);
+        window.canvas.on("selection:cleared", this.handleSelectionCleared);
+        window.canvas.on("object:modified", this.handleObjectModified);
+        window.canvas.on("object:added", this.handleObjectAdded);
+        window.canvas.on("object:removed", this.handleObjectRemoved);
+
+        // Initialize history management
+        this.initHistory();
+      } else {
+        console.error("Canvas not initialized before component setup");
+      }
+
+      // Existing watchers and event listeners
       this.$watch("activeTool", (value) => {
-        // Broadcast the active tool to all components
         this.$dispatch("tool-changed", { type: value });
       });
 
-      // Handle tool selection from sidebar
       this.$root.addEventListener("change-tool", (e) => {
         this.activeTool = e.detail.type;
       });
@@ -704,6 +698,20 @@ Alpine.data("textPanel", () => ({
       this.isActive = e.detail.type === "text";
     });
 
+    this.$watch("textProperties", () => {
+      if (this.selectedObject && this.selectedObject.type === "text") {
+        this.updateTextProperty("fill", this.textProperties.fill); // Example
+        // Add other properties as needed
+      }
+    });
+
+    window.addEventListener("object:selected", (e) => {
+      if (e.detail) {
+        this.selectedObject = window.canvas.getActiveObject();
+        this.syncTextProperties();
+      }
+    });
+
     // Listen for object selection
     window.addEventListener("object:selected", (e) => {
       if (e.detail && e.detail.type === "text") {
@@ -721,19 +729,24 @@ Alpine.data("textPanel", () => ({
   // Add simple text
   addText() {
     if (!window.canvas) return;
-
     const text = new fabric.Text("Your text here", {
       left: 100,
       top: 100,
       fontFamily: this.textProperties.fontFamily,
       fontSize: this.textProperties.fontSize,
       fill: this.textProperties.fill,
+      editable: true, // Enable editing
+      selectable: true, // Enable selection
+      hasControls: true, // Show controls
+      hoverCursor: "pointer", // Show pointer on hover
+      onclick: () => {
+        window.canvas.setActiveObject(text);
+        this.selectedObject = text;
+      },
     });
-
     window.canvas.add(text);
     window.canvas.setActiveObject(text);
     window.canvas.renderAll();
-
     this.selectedObject = text;
     this.syncTextProperties();
   },
@@ -775,6 +788,20 @@ Alpine.data("textPanel", () => ({
       fontSize: props.fontSize,
       fontWeight: props.fontWeight,
       fill: this.textProperties.fill,
+      editable: true,
+      selectable: true,
+      hasControls: true,
+      adjustable: true,
+      activeCursor: "pointer",
+      activeOnClick: () => {
+        window.canvas.setActiveObject(text);
+        this.selectedObject = text;
+      },
+      onclick: () => {
+        // Can be set as active
+        window.canvas.setActiveObject(text);
+        this.selectedObject = text;
+      },
     });
 
     window.canvas.add(text);
@@ -982,6 +1009,45 @@ Alpine.data("uploadsPanel", () => ({
   },
 
   init() {
+    // Watch brightness
+    this.$watch("filterSettings.brightness", (newBrightness) => {
+      if (
+        this.selectedObject &&
+        this.selectedObject.type === "image" &&
+        window.canvas
+      ) {
+        this.applyFilters();
+        window.canvas.renderAll();
+      }
+    });
+
+    // Watch contrast
+    this.$watch("filterSettings.contrast", (newContrast) => {
+      if (
+        this.selectedObject &&
+        this.selectedObject.type === "image" &&
+        window.canvas
+      ) {
+        this.applyFilters();
+        window.canvas.renderAll();
+      }
+    });
+  },
+
+  // Helper method to apply filters
+  applyFilters() {
+    if (this.selectedObject && this.selectedObject.type === "image") {
+      this.selectedObject.filters = [
+        new fabric.Image.filters.Brightness({
+          brightness: parseFloat(this.filterSettings.brightness),
+        }),
+        new fabric.Image.filters.Contrast({
+          contrast: parseFloat(this.filterSettings.contrast),
+        }),
+      ];
+      this.selectedObject.applyFilters();
+    }
+
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       this.isActive = e.detail.type === "uploads";
@@ -1339,7 +1405,6 @@ Alpine.data("uploadsPanel", () => ({
     window.canvas.renderAll();
   },
 }));
-// Drawing Panel Component
 Alpine.data("drawingPanel", () => ({
   isActive: false,
   activeTab: "brush",
@@ -1369,6 +1434,129 @@ Alpine.data("drawingPanel", () => ({
   },
 
   init() {
+    // **Watch Brush Settings**
+    this.$watch("brushSettings.size", (newSize) => {
+      if (
+        this.activeTab === "brush" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
+      }
+    });
+
+    this.$watch("brushSettings.opacity", (newOpacity) => {
+      if (
+        this.activeTab === "brush" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.opacity = parseFloat(newOpacity);
+      }
+    });
+
+    this.$watch("brushSettings.color", (newColor) => {
+      if (
+        this.activeTab === "brush" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.color = newColor;
+      }
+    });
+
+    // **Watch Eraser Settings**
+    this.$watch("eraserSettings.size", (newSize) => {
+      if (
+        this.activeTab === "eraser" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
+      }
+    });
+
+    this.$watch("eraserSettings.invert", (newInvert) => {
+      if (
+        this.activeTab === "eraser" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.setupEraser(); // Reconfigure eraser for invert change
+      }
+    });
+
+    // **Watch Pencil Settings**
+    this.$watch("pencilSettings.brushType", (newBrushType) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.setupPencil(); // Reconfigure pencil for brush type change
+      }
+    });
+
+    this.$watch("pencilSettings.size", (newSize) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
+      }
+    });
+
+    this.$watch("pencilSettings.shadowWidth", (newShadowWidth) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.updatePencilShadow();
+      }
+    });
+
+    this.$watch("pencilSettings.shadowOffsetX", (newOffsetX) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.updatePencilShadow();
+      }
+    });
+
+    this.$watch("pencilSettings.shadowOffsetY", (newOffsetY) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.updatePencilShadow();
+      }
+    });
+
+    this.$watch("pencilSettings.color", (newColor) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        window.canvas.freeDrawingBrush.color = newColor;
+      }
+    });
+
+    this.$watch("pencilSettings.shadowColor", (newShadowColor) => {
+      if (
+        this.activeTab === "pencil" &&
+        window.canvas &&
+        window.canvas.isDrawingMode
+      ) {
+        this.updatePencilShadow();
+      }
+    });
+
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       const wasActive = this.isActive;
@@ -1383,6 +1571,23 @@ Alpine.data("drawingPanel", () => ({
     });
   },
 
+  // **Helper Method to Update Pencil Shadow**
+  updatePencilShadow() {
+    if (window.canvas && window.canvas.freeDrawingBrush) {
+      const shadowWidth = parseInt(this.pencilSettings.shadowWidth);
+      if (shadowWidth > 0) {
+        window.canvas.freeDrawingBrush.shadow = new fabric.Shadow({
+          blur: shadowWidth,
+          offsetX: parseInt(this.pencilSettings.shadowOffsetX),
+          offsetY: parseInt(this.pencilSettings.shadowOffsetY),
+          color: this.pencilSettings.shadowColor,
+        });
+      } else {
+        window.canvas.freeDrawingBrush.shadow = null;
+      }
+    }
+  },
+
   // Update brush preview (UI only)
   updateBrushPreview() {
     // This is handled by Alpine.js binding in the template
@@ -1391,28 +1596,20 @@ Alpine.data("drawingPanel", () => ({
   // Activate drawing mode on the canvas
   activateDrawingMode() {
     if (!window.canvas) return;
-
-    // Enable Fabric.js free drawing mode
     window.canvas.isDrawingMode = true;
-
-    // Apply current settings based on active tab
     this.updateDrawingMode(this.activeTab);
   },
 
   // Deactivate drawing mode
   deactivateDrawingMode() {
     if (!window.canvas) return;
-
-    // Disable Fabric.js free drawing mode
     window.canvas.isDrawingMode = false;
   },
 
   // Update drawing mode based on active tab
   updateDrawingMode(tabName) {
     if (!window.canvas) return;
-
     this.activeTab = tabName;
-
     switch (tabName) {
       case "brush":
         this.setupBrush();
@@ -1429,16 +1626,10 @@ Alpine.data("drawingPanel", () => ({
   // Setup brush drawing
   setupBrush() {
     if (!window.canvas) return;
-
-    // Create a new brush
     const brush = new fabric.PencilBrush(window.canvas);
-
-    // Set brush properties
     brush.width = parseInt(this.brushSettings.size);
     brush.color = this.brushSettings.color;
     brush.opacity = parseFloat(this.brushSettings.opacity);
-
-    // Apply brush to canvas
     window.canvas.freeDrawingBrush = brush;
     window.canvas.isDrawingMode = true;
   },
@@ -1446,71 +1637,48 @@ Alpine.data("drawingPanel", () => ({
   // Setup eraser
   setupEraser() {
     if (!window.canvas) return;
-
-    // Use Fabric's eraser brush if available (newer versions)
     if (fabric.EraserBrush) {
       const eraser = new fabric.EraserBrush(window.canvas);
       eraser.width = parseInt(this.eraserSettings.size);
-
-      // Set inverted mode if needed
-      if (this.eraserSettings.invert) {
-        eraser.inverted = true;
-      }
-
-      // Apply eraser to canvas
+      eraser.inverted = this.eraserSettings.invert;
       window.canvas.freeDrawingBrush = eraser;
     } else {
-      // Fallback for older versions: use pencil brush with destination-out composite
       const eraser = new fabric.PencilBrush(window.canvas);
       eraser.width = parseInt(this.eraserSettings.size);
       eraser.color = "rgba(0,0,0,1)";
       eraser.globalCompositeOperation = "destination-out";
-
-      // Apply eraser to canvas
       window.canvas.freeDrawingBrush = eraser;
     }
-
     window.canvas.isDrawingMode = true;
   },
 
   // Setup pencil with different brush types
   setupPencil() {
     if (!window.canvas) return;
-
     let brush;
-
-    // Create appropriate brush based on brush type
     switch (this.pencilSettings.brushType) {
       case "Circle":
-        if (fabric.CircleBrush) {
-          brush = new fabric.CircleBrush(window.canvas);
-        } else {
-          brush = new fabric.PencilBrush(window.canvas);
-        }
+        brush = fabric.CircleBrush
+          ? new fabric.CircleBrush(window.canvas)
+          : new fabric.PencilBrush(window.canvas);
         break;
       case "Spray":
-        if (fabric.SprayBrush) {
-          brush = new fabric.SprayBrush(window.canvas);
-        } else {
-          brush = new fabric.PencilBrush(window.canvas);
-        }
+        brush = fabric.SprayBrush
+          ? new fabric.SprayBrush(window.canvas)
+          : new fabric.PencilBrush(window.canvas);
         break;
       case "hLine":
       case "vLine":
       case "square":
       case "diamond":
       case "texture":
-        // Create a pattern brush if available
         if (fabric.PatternBrush) {
           brush = new fabric.PatternBrush(window.canvas);
           brush.getPatternSrc = () => {
-            // Create a pattern based on the selected type
             const patternCanvas = document.createElement("canvas");
             const ctx = patternCanvas.getContext("2d");
             patternCanvas.width = patternCanvas.height = 10;
-
             ctx.fillStyle = this.pencilSettings.color;
-
             switch (this.pencilSettings.brushType) {
               case "hLine":
                 ctx.fillRect(0, 5, 10, 1);
@@ -1537,7 +1705,6 @@ Alpine.data("drawingPanel", () => ({
                 ctx.fillRect(2, 8, 1, 1);
                 break;
             }
-
             return patternCanvas;
           };
         } else {
@@ -1545,25 +1712,21 @@ Alpine.data("drawingPanel", () => ({
         }
         break;
       default:
-        // Default to pencil brush
         brush = new fabric.PencilBrush(window.canvas);
     }
-
-    // Set common properties
     brush.width = parseInt(this.pencilSettings.size);
     brush.color = this.pencilSettings.color;
-
-    // Set shadow if enabled
-    if (parseInt(this.pencilSettings.shadowWidth) > 0) {
+    const shadowWidth = parseInt(this.pencilSettings.shadowWidth);
+    if (shadowWidth > 0) {
       brush.shadow = new fabric.Shadow({
-        blur: parseInt(this.pencilSettings.shadowWidth),
+        blur: shadowWidth,
         offsetX: parseInt(this.pencilSettings.shadowOffsetX),
         offsetY: parseInt(this.pencilSettings.shadowOffsetY),
         color: this.pencilSettings.shadowColor,
       });
+    } else {
+      brush.shadow = null;
     }
-
-    // Apply brush to canvas
     window.canvas.freeDrawingBrush = brush;
     window.canvas.isDrawingMode = true;
   },
@@ -2290,5 +2453,3 @@ document.addEventListener("DOMContentLoaded", () => {
   Alpine.start();
   console.log("Steve Editor initialized!");
 });
-// Start Alpine
-Alpine.start();

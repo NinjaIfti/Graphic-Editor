@@ -1091,6 +1091,14 @@
 
             <!-- Panel Body -->
             <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              <div x-show="selectedObject && selectedObject.type === 'text'">
+                <input
+                  type="text"
+                  x-model="selectedObject.text"
+                  @input="selectedObject.set('text', $event.target.value); window.canvas.renderAll()"
+                  class="w-full p-2 border rounded"
+                />
+              </div>
               <!-- Add Text Button -->
               <button
                 @click="addText()"
