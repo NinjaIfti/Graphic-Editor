@@ -3,46 +3,9 @@
 // Import required libraries
 import Alpine from "alpinejs";
 import * as fabric from "fabric";
-
+import { CurvedText, getRangeFromPercentage } from "./curved-text.js";
 // Make Alpine globally available
 window.Alpine = Alpine;
-
-function initCanvas() {
-  // Create canvas instance
-  const canvas = new fabric.Canvas("image-editor", {
-    preserveObjectStacking: true,
-    width: document.getElementById("image-editor").clientWidth,
-    height: document.getElementById("image-editor").clientHeight,
-    backgroundColor: "#ffffff",
-  });
-
-  // Make it globally available
-  window.canvas = canvas;
-
-  // Add a few demo objects
-  const welcomeText = new fabric.Text("Welcome to Steve Editor", {
-    fontFamily: "Roboto",
-    fontSize: 30,
-    fill: "#333333",
-    left: 400,
-    top: 100,
-    editable: true,
-    selectable: true,
-    hasControls: true,
-    clickable: true,
-    hoverCursor: "pointer",
-  });
-
-  canvas.add(welcomeText);
-  canvas.centerObject(welcomeText);
-
-  // Notify other components that canvas is ready
-  window.dispatchEvent(
-    new CustomEvent("canvas:initialized", {
-      detail: { canvas: canvas },
-    })
-  );
-}
 
 // Initialize Alpine
 document.addEventListener("alpine:init", () => {
@@ -51,29 +14,76 @@ document.addEventListener("alpine:init", () => {
     activeTool: "templates", // Default active tool
 
     init() {
-      // Set up canvas event listeners if canvas exists
-      if (window.canvas) {
-        window.canvas.on("selection:created", this.handleSelection);
-        window.canvas.on("selection:updated", this.handleSelection);
-        window.canvas.on("selection:cleared", this.handleSelectionCleared);
-        window.canvas.on("object:modified", this.handleObjectModified);
-        window.canvas.on("object:added", this.handleObjectAdded);
-        window.canvas.on("object:removed", this.handleObjectRemoved);
+      // Initialize the canvas when the DOM is ready
+      this.$nextTick(() => {
+        this.initCanvas();
+      });
 
-        // Initialize history management
-        this.initHistory();
-      } else {
-        console.error("Canvas not initialized before component setup");
-      }
-
-      // Existing watchers and event listeners
+      // Listen for tool changes from sidebar
       this.$watch("activeTool", (value) => {
+        // Broadcast the active tool to all components
         this.$dispatch("tool-changed", { type: value });
       });
 
+      // Handle tool selection from sidebar
       this.$root.addEventListener("change-tool", (e) => {
         this.activeTool = e.detail.type;
       });
+    },
+
+    // Initialize the main canvas
+    initCanvas() {
+      // Create canvas instance
+      const canvas = new fabric.Canvas("image-editor", {
+        preserveObjectStacking: true,
+        width: 12000,
+        height: 600,
+        backgroundColor: "#ffffff",
+      });
+
+      // Make it globally available
+      window.canvas = canvas;
+
+      // Set up event listeners
+      canvas.on("selection:created", this.handleSelection);
+      canvas.on("selection:updated", this.handleSelection);
+      canvas.on("selection:cleared", this.handleSelectionCleared);
+      canvas.on("object:modified", this.handleObjectModified);
+      canvas.on("object:added", this.handleObjectAdded);
+      canvas.on("object:removed", this.handleObjectRemoved);
+
+      // Initialize history stack for undo/redo
+      this.initHistory();
+
+      // Add a few demo objects
+      const welcomeText = new fabric.Text("Welcome to Steve Editor", {
+        fontFamily: "Roboto",
+        fontSize: 30,
+        fill: "#333333",
+        left: 400,
+        top: 100,
+      });
+
+      const rectangle = new fabric.Rect({
+        width: 200,
+        height: 150,
+        fill: "#ff5555",
+        left: 300,
+        top: 300,
+        rx: 10,
+        ry: 10,
+      });
+
+      canvas.add(welcomeText);
+      canvas.add(rectangle);
+      canvas.centerObject(welcomeText);
+
+      // Notify other components that canvas is ready
+      window.dispatchEvent(
+        new CustomEvent("canvas:initialized", {
+          detail: { canvas: canvas },
+        })
+      );
     },
 
     // Handle selection events
@@ -653,6 +663,9 @@ Alpine.data("textPanel", () => ({
   selectedObject: null,
   showDistortion: false,
   showShadow: false,
+  showCurve: false, // New property for curve section visibility
+  curveValue: 2500, // Default value (center of the range)
+  curveAngle: 0, // Default angle value (no curve)
 
   // Text properties
   textProperties: {
@@ -693,30 +706,33 @@ Alpine.data("textPanel", () => ({
   fontSearch: "",
 
   init() {
+    // Initialize filtered fonts
+    this.filteredFonts = [...this.fonts];
+
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       this.isActive = e.detail.type === "text";
     });
 
-    this.$watch("textProperties", () => {
-      if (this.selectedObject && this.selectedObject.type === "text") {
-        this.updateTextProperty("fill", this.textProperties.fill); // Example
-        // Add other properties as needed
-      }
-    });
-
-    window.addEventListener("object:selected", (e) => {
-      if (e.detail) {
-        this.selectedObject = window.canvas.getActiveObject();
-        this.syncTextProperties();
-      }
-    });
-
     // Listen for object selection
     window.addEventListener("object:selected", (e) => {
-      if (e.detail && e.detail.type === "text") {
+      if (
+        e.detail &&
+        (e.detail.type === "text" || e.detail.type === "curved-text")
+      ) {
         this.selectedObject = e.detail;
         this.syncTextProperties();
+
+        // Update curve values if it's a curved text
+        if (e.detail.type === "curved-text") {
+          const percentage = e.detail.percentage || 0;
+          this.curveValue = getRangeFromPercentage(percentage);
+          this.curveAngle = (percentage * 3.6).toFixed(0);
+        } else {
+          // Reset curve for regular text
+          this.curveValue = 2500;
+          this.curveAngle = 0;
+        }
       }
     });
 
@@ -729,24 +745,19 @@ Alpine.data("textPanel", () => ({
   // Add simple text
   addText() {
     if (!window.canvas) return;
+
     const text = new fabric.Text("Your text here", {
       left: 100,
       top: 100,
       fontFamily: this.textProperties.fontFamily,
       fontSize: this.textProperties.fontSize,
       fill: this.textProperties.fill,
-      editable: true, // Enable editing
-      selectable: true, // Enable selection
-      hasControls: true, // Show controls
-      hoverCursor: "pointer", // Show pointer on hover
-      onclick: () => {
-        window.canvas.setActiveObject(text);
-        this.selectedObject = text;
-      },
     });
+
     window.canvas.add(text);
     window.canvas.setActiveObject(text);
     window.canvas.renderAll();
+
     this.selectedObject = text;
     this.syncTextProperties();
   },
@@ -788,20 +799,6 @@ Alpine.data("textPanel", () => ({
       fontSize: props.fontSize,
       fontWeight: props.fontWeight,
       fill: this.textProperties.fill,
-      editable: true,
-      selectable: true,
-      hasControls: true,
-      adjustable: true,
-      activeCursor: "pointer",
-      activeOnClick: () => {
-        window.canvas.setActiveObject(text);
-        this.selectedObject = text;
-      },
-      onclick: () => {
-        // Can be set as active
-        window.canvas.setActiveObject(text);
-        this.selectedObject = text;
-      },
     });
 
     window.canvas.add(text);
@@ -814,30 +811,85 @@ Alpine.data("textPanel", () => ({
 
   // Sync text properties when object is selected
   syncTextProperties() {
-    if (!this.selectedObject || this.selectedObject.type !== "text") return;
+    if (!this.selectedObject) return;
+
+    // Handle both regular text and curved text
+    const isText = this.selectedObject.type === "text";
+    const isCurvedText = this.selectedObject.type === "curved-text";
+    const isCurvedTextGroup =
+      this.selectedObject.type === "group" && this.selectedObject.originalText;
+
+    if (!isText && !isCurvedText && !isCurvedTextGroup) return;
 
     const obj = this.selectedObject;
 
-    this.textProperties = {
-      fill: obj.fill || "#000000",
-      fontFamily: obj.fontFamily || "Roboto",
-      fontSize: obj.fontSize || 40,
-      fontWeight: obj.fontWeight || "normal",
-      fontStyle: obj.fontStyle || "normal",
-      underline: obj.underline || false,
-      opacity: obj.opacity || 1,
-      stroke: obj.stroke || "#000000",
-      strokeWidth: obj.strokeWidth || 0,
-      charSpacing: obj.charSpacing || 0,
-      rotation: obj.angle || 0,
-      skewX: obj.skewX || 0,
-      skewY: obj.skewY || 0,
-      shadowEnabled: !!obj.shadow,
-      shadowColor: obj.shadow ? obj.shadow.color : "#dddddd",
-      shadowBlur: obj.shadow ? obj.shadow.blur : 20,
-      shadowOffsetX: obj.shadow ? obj.shadow.offsetX : 0,
-      shadowOffsetY: obj.shadow ? obj.shadow.offsetY : 0,
-    };
+    // If it's a curved text, use its properties
+    if (isCurvedText) {
+      this.textProperties = {
+        fill: obj.fill || "#000000",
+        fontFamily: obj.fontFamily || "Roboto",
+        fontSize: obj.fontSize || 40,
+        fontWeight: obj.fontWeight || "normal",
+        fontStyle: obj.fontStyle || "normal",
+        underline: false, // Curved text doesn't support underline
+        opacity: obj.opacity || 1,
+        stroke: obj.strokeStyle || "#000000", // Note: CurvedText uses strokeStyle
+        strokeWidth: obj.strokeWidth || 0,
+        charSpacing: obj.kerning || 0, // Note: CurvedText uses kerning
+        rotation: obj.angle || 0,
+        skewX: 0, // Not applicable for curved text
+        skewY: 0, // Not applicable for curved text
+        shadowEnabled: !!obj.shadow,
+        shadowColor: obj.shadow ? obj.shadow.color : "#dddddd",
+        shadowBlur: obj.shadow ? obj.shadow.blur : 20,
+        shadowOffsetX: obj.shadow ? obj.shadow.offsetX : 0,
+        shadowOffsetY: obj.shadow ? obj.shadow.offsetY : 0,
+      };
+      // If it's a curved text group (from the older implementation), use its stored properties
+    } else if (isCurvedTextGroup) {
+      this.textProperties = {
+        fill: obj.textProps?.fill || "#000000",
+        fontFamily: obj.textProps?.fontFamily || "Roboto",
+        fontSize: obj.textProps?.fontSize || 40,
+        fontWeight: obj.textProps?.fontWeight || "normal",
+        fontStyle: obj.textProps?.fontStyle || "normal",
+        underline: false, // Groups don't support underline
+        opacity: obj.opacity || 1,
+        stroke: obj.textProps?.stroke || "#000000",
+        strokeWidth: obj.textProps?.strokeWidth || 0,
+        charSpacing: 0, // Not applicable for curved text
+        rotation: obj.angle || 0,
+        skewX: 0, // Not applicable for curved text
+        skewY: 0, // Not applicable for curved text
+        shadowEnabled: false, // Groups don't support shadow the same way
+        shadowColor: "#dddddd",
+        shadowBlur: 20,
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
+      };
+    } else {
+      // Regular text object
+      this.textProperties = {
+        fill: obj.fill || "#000000",
+        fontFamily: obj.fontFamily || "Roboto",
+        fontSize: obj.fontSize || 40,
+        fontWeight: obj.fontWeight || "normal",
+        fontStyle: obj.fontStyle || "normal",
+        underline: obj.underline || false,
+        opacity: obj.opacity || 1,
+        stroke: obj.stroke || "#000000",
+        strokeWidth: obj.strokeWidth || 0,
+        charSpacing: obj.charSpacing || 0,
+        rotation: obj.angle || 0,
+        skewX: obj.skewX || 0,
+        skewY: obj.skewY || 0,
+        shadowEnabled: !!obj.shadow,
+        shadowColor: obj.shadow ? obj.shadow.color : "#dddddd",
+        shadowBlur: obj.shadow ? obj.shadow.blur : 20,
+        shadowOffsetX: obj.shadow ? obj.shadow.offsetX : 0,
+        shadowOffsetY: obj.shadow ? obj.shadow.offsetY : 0,
+      };
+    }
   },
 
   // Toggle font weight (bold/normal)
@@ -941,6 +993,242 @@ Alpine.data("textPanel", () => ({
     window.canvas.renderAll();
   },
 
+  // Get percentage from range value
+  getPercentageFromRange(value) {
+    let percentage =
+      value >= 2500 ? (value - 2500) / 25 : -((2500 - value) / 25);
+    percentage = percentage.toFixed(0);
+    if (percentage == -0 || percentage == "-0") percentage = 0;
+
+    // Limit percentage to -90 to 90
+    if (percentage > 90) percentage = 90;
+    if (percentage < -90) percentage = -90;
+
+    return parseInt(percentage);
+  },
+
+  // Update curve value from the slider
+  updateTextCurve(value) {
+    if (!window.canvas || !this.selectedObject) return;
+
+    this.curveValue = value;
+    let percentage = this.getPercentageFromRange(value);
+    this.curveAngle = (percentage * 3.6).toFixed(0);
+
+    this.applyCurve(percentage);
+  },
+
+  // Update curve from angle input
+  updateCurveFromAngle(angle) {
+    if (!window.canvas || !this.selectedObject) return;
+
+    let val = parseInt(angle);
+
+    // Limit angle to -360 to 360
+    if (val > 360) val = 360;
+    else if (val < -360) val = -360;
+
+    // Convert angle to percentage
+    let percentage = (val / 360) * 100;
+
+    // Limit percentage to -90 to 90
+    if (percentage > 90) percentage = 90;
+    else if (percentage < -90) percentage = -90;
+
+    // Get range value from percentage
+    this.curveValue = getRangeFromPercentage(percentage);
+    this.curveAngle = val;
+
+    this.applyCurve(percentage);
+  },
+
+  // Apply curve to text
+  applyCurve(percentage) {
+    if (!window.canvas || !this.selectedObject) return;
+
+    const obj = this.selectedObject;
+
+    // Only work with text objects or curved text
+    if (
+      obj.type !== "text" &&
+      obj.type !== "curved-text" &&
+      !(obj.type === "group" && obj.originalText)
+    )
+      return;
+
+    const isFlipped = percentage < 0;
+    const hasCurveApply = parseInt(percentage) != 0;
+    let value = Math.abs(2500 - this.curveValue);
+
+    // Check if we need to apply curve
+    if (hasCurveApply && obj.type === "text") {
+      this.addCurveText(obj, value, percentage);
+    } else if (
+      !hasCurveApply &&
+      (obj.type === "curved-text" || (obj.type === "group" && obj.originalText))
+    ) {
+      // Get the original text
+      const originalText =
+        obj.type === "curved-text" ? obj.text : obj.originalText;
+
+      // Convert curved text back to regular text
+      const text = new fabric.Text(originalText, {
+        left: obj.left,
+        top: obj.top,
+        scaleX: obj.scaleX,
+        scaleY: obj.scaleY,
+        fontFamily:
+          obj.type === "curved-text"
+            ? obj.fontFamily
+            : obj.textProps?.fontFamily || "Roboto",
+        fontSize:
+          obj.type === "curved-text"
+            ? obj.fontSize
+            : obj.textProps?.fontSize || 40,
+        fontWeight:
+          obj.type === "curved-text"
+            ? obj.fontWeight
+            : obj.textProps?.fontWeight || "normal",
+        fontStyle:
+          obj.type === "curved-text"
+            ? obj.fontStyle
+            : obj.textProps?.fontStyle || "normal",
+        fill:
+          obj.type === "curved-text"
+            ? obj.fill
+            : obj.textProps?.fill || "#000000",
+        stroke:
+          obj.type === "curved-text"
+            ? obj.strokeStyle
+            : obj.textProps?.stroke || "#000000",
+        strokeWidth:
+          obj.type === "curved-text"
+            ? obj.strokeWidth
+            : obj.textProps?.strokeWidth || 0,
+        angle: obj.angle || 0,
+        charSpacing:
+          obj.type === "curved-text" ? obj.kerning : obj.charSpacing || 0,
+        underline: false,
+        originX: "center",
+        originY: "center",
+      });
+
+      let index = window.canvas.getObjects().indexOf(obj);
+      window.canvas.remove(obj);
+      window.canvas.add(text);
+      window.canvas.setActiveObject(text);
+      window.canvas.moveTo(text, index);
+
+      // Update the reference
+      this.selectedObject = text;
+    } else if (hasCurveApply && obj.type === "curved-text") {
+      // Update existing curved text
+      // Calculate arcSpan - how much of a circle the text should span
+      const arcSpanValue = Math.min(Math.abs(percentage) / 100, 0.9);
+
+      obj.set({
+        _cachedCanvas: null,
+        diameter: value,
+        flipped: isFlipped,
+        percentage: percentage,
+        arcMode: true,
+        arcSpan: arcSpanValue,
+        originX: "center",
+        originY: "center",
+      });
+
+      obj._needsRecalculate = true;
+      obj._updateObj("scaleX", obj.scaleX);
+      obj._updateObj("scaleY", obj.scaleY);
+    } else if (hasCurveApply && obj.type === "group" && obj.originalText) {
+      // Convert grouped curved text to CurvedText class
+      const text = obj.originalText;
+      window.canvas.remove(obj);
+
+      this.addCurveText(
+        {
+          text: text,
+          left: obj.left,
+          top: obj.top,
+          scaleX: obj.scaleX,
+          scaleY: obj.scaleY,
+          fontFamily: obj.textProps?.fontFamily || "Roboto",
+          fontSize: obj.textProps?.fontSize || 40,
+          fontWeight: obj.textProps?.fontWeight || "normal",
+          fontStyle: obj.textProps?.fontStyle || "normal",
+          fill: obj.textProps?.fill || "#000000",
+          stroke: obj.textProps?.stroke || "#000000",
+          strokeWidth: obj.textProps?.strokeWidth || 0,
+        },
+        value,
+        percentage
+      );
+    }
+
+    window.canvas.requestRenderAll();
+  },
+
+  // Add curved text using the new approach
+  addCurveText(obj, diameter, percentage) {
+    if (!window.canvas) return;
+
+    // Get text content
+    const text = obj.text || obj.originalText || obj;
+
+    // Create options
+    const options = {
+      left: obj.left,
+      top: obj.top,
+      scaleX: obj.scaleX || 1,
+      scaleY: obj.scaleY || 1,
+      fontSize: obj.fontSize || 40,
+      fontFamily: obj.fontFamily || "Roboto",
+      fontWeight: obj.fontWeight || "normal",
+      fontStyle: obj.fontStyle || "normal",
+      fill: obj.fill || "#000000",
+      stroke: obj.stroke || obj.strokeStyle || "#000000",
+      strokeWidth: obj.strokeWidth || 0,
+      kerning: parseInt(obj.charSpacing || 0) / 10,
+
+      // Curved text specifics
+      diameter: parseInt(diameter),
+      percentage: percentage,
+      flipped: percentage < 0,
+    };
+
+    console.log("Creating curved text with options:", options);
+
+    // Create curved text
+    const curvedText = new CurvedText(
+      typeof text === "string" ? text : text.text,
+      options
+    );
+
+    // Handle index positioning
+    let index = -1;
+    if (obj.type) {
+      index = window.canvas.getObjects().indexOf(obj);
+      window.canvas.remove(obj);
+    }
+
+    // Add to canvas
+    const fabricObject = curvedText.addToCanvas(window.canvas);
+    window.canvas.setActiveObject(fabricObject);
+
+    // Maintain position in z-order
+    if (index >= 0) {
+      window.canvas.moveTo(fabricObject, index);
+    }
+
+    // Update reference
+    this.selectedObject = fabricObject;
+
+    // Render
+    window.canvas.requestRenderAll();
+
+    return fabricObject;
+  },
+
   // Update shadow properties
   updateShadow(property, value) {
     if (
@@ -1009,45 +1297,6 @@ Alpine.data("uploadsPanel", () => ({
   },
 
   init() {
-    // Watch brightness
-    this.$watch("filterSettings.brightness", (newBrightness) => {
-      if (
-        this.selectedObject &&
-        this.selectedObject.type === "image" &&
-        window.canvas
-      ) {
-        this.applyFilters();
-        window.canvas.renderAll();
-      }
-    });
-
-    // Watch contrast
-    this.$watch("filterSettings.contrast", (newContrast) => {
-      if (
-        this.selectedObject &&
-        this.selectedObject.type === "image" &&
-        window.canvas
-      ) {
-        this.applyFilters();
-        window.canvas.renderAll();
-      }
-    });
-  },
-
-  // Helper method to apply filters
-  applyFilters() {
-    if (this.selectedObject && this.selectedObject.type === "image") {
-      this.selectedObject.filters = [
-        new fabric.Image.filters.Brightness({
-          brightness: parseFloat(this.filterSettings.brightness),
-        }),
-        new fabric.Image.filters.Contrast({
-          contrast: parseFloat(this.filterSettings.contrast),
-        }),
-      ];
-      this.selectedObject.applyFilters();
-    }
-
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       this.isActive = e.detail.type === "uploads";
@@ -1405,6 +1654,7 @@ Alpine.data("uploadsPanel", () => ({
     window.canvas.renderAll();
   },
 }));
+// Drawing Panel Component
 Alpine.data("drawingPanel", () => ({
   isActive: false,
   activeTab: "brush",
@@ -1433,130 +1683,12 @@ Alpine.data("drawingPanel", () => ({
     shadowColor: "#000000",
   },
 
+  // Store original canvas state for undo/redo
+  canvasHistory: [],
+  historyIndex: -1,
+  maxHistorySteps: 20,
+
   init() {
-    // **Watch Brush Settings**
-    this.$watch("brushSettings.size", (newSize) => {
-      if (
-        this.activeTab === "brush" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
-      }
-    });
-
-    this.$watch("brushSettings.opacity", (newOpacity) => {
-      if (
-        this.activeTab === "brush" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.opacity = parseFloat(newOpacity);
-      }
-    });
-
-    this.$watch("brushSettings.color", (newColor) => {
-      if (
-        this.activeTab === "brush" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.color = newColor;
-      }
-    });
-
-    // **Watch Eraser Settings**
-    this.$watch("eraserSettings.size", (newSize) => {
-      if (
-        this.activeTab === "eraser" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
-      }
-    });
-
-    this.$watch("eraserSettings.invert", (newInvert) => {
-      if (
-        this.activeTab === "eraser" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.setupEraser(); // Reconfigure eraser for invert change
-      }
-    });
-
-    // **Watch Pencil Settings**
-    this.$watch("pencilSettings.brushType", (newBrushType) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.setupPencil(); // Reconfigure pencil for brush type change
-      }
-    });
-
-    this.$watch("pencilSettings.size", (newSize) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.width = parseInt(newSize, 10);
-      }
-    });
-
-    this.$watch("pencilSettings.shadowWidth", (newShadowWidth) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.updatePencilShadow();
-      }
-    });
-
-    this.$watch("pencilSettings.shadowOffsetX", (newOffsetX) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.updatePencilShadow();
-      }
-    });
-
-    this.$watch("pencilSettings.shadowOffsetY", (newOffsetY) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.updatePencilShadow();
-      }
-    });
-
-    this.$watch("pencilSettings.color", (newColor) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        window.canvas.freeDrawingBrush.color = newColor;
-      }
-    });
-
-    this.$watch("pencilSettings.shadowColor", (newShadowColor) => {
-      if (
-        this.activeTab === "pencil" &&
-        window.canvas &&
-        window.canvas.isDrawingMode
-      ) {
-        this.updatePencilShadow();
-      }
-    });
-
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       const wasActive = this.isActive;
@@ -1569,47 +1701,156 @@ Alpine.data("drawingPanel", () => ({
         this.deactivateDrawingMode();
       }
     });
+
+    // Add watchers for settings changes
+    this.$watch(
+      "brushSettings",
+      () => {
+        if (this.isActive && this.activeTab === "brush") {
+          this.setupBrush();
+        }
+      },
+      { deep: true }
+    );
+
+    this.$watch(
+      "eraserSettings",
+      () => {
+        if (this.isActive && this.activeTab === "eraser") {
+          this.setupEraser();
+        }
+      },
+      { deep: true }
+    );
+
+    this.$watch(
+      "pencilSettings",
+      () => {
+        if (this.isActive && this.activeTab === "pencil") {
+          this.setupPencil();
+        }
+      },
+      { deep: true }
+    );
+
+    // Add tab change listener
+    this.$watch("activeTab", (newTab) => {
+      if (this.isActive) {
+        this.updateDrawingMode(newTab);
+      }
+    });
+
+    // Add canvas history events
+    this.setupCanvasHistory();
   },
 
-  // **Helper Method to Update Pencil Shadow**
-  updatePencilShadow() {
-    if (window.canvas && window.canvas.freeDrawingBrush) {
-      const shadowWidth = parseInt(this.pencilSettings.shadowWidth);
-      if (shadowWidth > 0) {
-        window.canvas.freeDrawingBrush.shadow = new fabric.Shadow({
-          blur: shadowWidth,
-          offsetX: parseInt(this.pencilSettings.shadowOffsetX),
-          offsetY: parseInt(this.pencilSettings.shadowOffsetY),
-          color: this.pencilSettings.shadowColor,
-        });
-      } else {
-        window.canvas.freeDrawingBrush.shadow = null;
+  // Setup canvas history tracking
+  setupCanvasHistory() {
+    if (!window.canvas) return;
+
+    // Save initial state
+    this.saveCanvasState();
+
+    // Add event listener for object modifications
+    window.canvas.on("object:added", () => this.saveCanvasState());
+    window.canvas.on("object:modified", () => this.saveCanvasState());
+    window.canvas.on("object:removed", () => this.saveCanvasState());
+  },
+
+  // Save current canvas state
+  saveCanvasState() {
+    if (!window.canvas) return;
+
+    // Don't save if we're in the middle of applying history
+    if (this._applyingHistory) return;
+
+    try {
+      // Get JSON representation of canvas
+      const json = window.canvas.toJSON();
+
+      // Remove any states beyond current index
+      if (this.historyIndex < this.canvasHistory.length - 1) {
+        this.canvasHistory = this.canvasHistory.slice(0, this.historyIndex + 1);
       }
+
+      // Add new state
+      this.canvasHistory.push(json);
+
+      // Trim history if too long
+      if (this.canvasHistory.length > this.maxHistorySteps) {
+        this.canvasHistory.shift();
+      } else {
+        this.historyIndex++;
+      }
+    } catch (error) {
+      console.error("Error saving canvas state:", error);
+    }
+  },
+
+  // Undo last action
+  undo() {
+    if (this.historyIndex <= 0) return;
+    this.historyIndex--;
+    this.applyCanvasState(this.canvasHistory[this.historyIndex]);
+  },
+
+  // Redo last undone action
+  redo() {
+    if (this.historyIndex >= this.canvasHistory.length - 1) return;
+    this.historyIndex++;
+    this.applyCanvasState(this.canvasHistory[this.historyIndex]);
+  },
+
+  // Apply a saved canvas state
+  applyCanvasState(state) {
+    if (!window.canvas) return;
+
+    try {
+      this._applyingHistory = true;
+      window.canvas.loadFromJSON(state, () => {
+        window.canvas.renderAll();
+        this._applyingHistory = false;
+      });
+    } catch (error) {
+      console.error("Error applying canvas state:", error);
+      this._applyingHistory = false;
     }
   },
 
   // Update brush preview (UI only)
   updateBrushPreview() {
     // This is handled by Alpine.js binding in the template
+    if (this.isActive) {
+      this.updateDrawingMode(this.activeTab);
+    }
   },
 
   // Activate drawing mode on the canvas
   activateDrawingMode() {
-    if (!window.canvas) return;
-    window.canvas.isDrawingMode = true;
-    this.updateDrawingMode(this.activeTab);
-  },
+    if (!window.canvas) {
+      console.error("Canvas not found!");
+      return;
+    }
 
-  // Deactivate drawing mode
-  deactivateDrawingMode() {
-    if (!window.canvas) return;
-    window.canvas.isDrawingMode = false;
+    // Enable Fabric.js free drawing mode
+    window.canvas.isDrawingMode = true;
+
+    // Apply current settings based on active tab
+    this.updateDrawingMode(this.activeTab);
   },
 
   // Update drawing mode based on active tab
   updateDrawingMode(tabName) {
-    if (!window.canvas) return;
+    if (!window.canvas) {
+      console.error("Canvas not found when updating drawing mode");
+      return;
+    }
+
+    // Clean up previous mode
+    this.deactivateDrawingMode();
+
     this.activeTab = tabName;
+
     switch (tabName) {
       case "brush":
         this.setupBrush();
@@ -1626,109 +1867,224 @@ Alpine.data("drawingPanel", () => ({
   // Setup brush drawing
   setupBrush() {
     if (!window.canvas) return;
-    const brush = new fabric.PencilBrush(window.canvas);
-    brush.width = parseInt(this.brushSettings.size);
-    brush.color = this.brushSettings.color;
-    brush.opacity = parseFloat(this.brushSettings.opacity);
-    window.canvas.freeDrawingBrush = brush;
-    window.canvas.isDrawingMode = true;
+
+    try {
+      // Create a new brush
+      const brush = new fabric.PencilBrush(window.canvas);
+
+      // Set brush properties
+      brush.width = parseInt(this.brushSettings.size);
+      const opacity = parseFloat(this.brushSettings.opacity);
+
+      // Set opacity through rgba color if opacity is less than 1
+      if (opacity < 1) {
+        // Parse the hex color to rgb
+        const hex = this.brushSettings.color.replace("#", "");
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        brush.color = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      } else {
+        brush.color = this.brushSettings.color;
+      }
+
+      // Apply brush to canvas
+      window.canvas.freeDrawingBrush = brush;
+      window.canvas.isDrawingMode = true;
+    } catch (error) {
+      console.error("Error setting up brush:", error);
+    }
   },
 
-  // Setup eraser
+  // Setup eraser - improved version
   setupEraser() {
     if (!window.canvas) return;
-    if (fabric.EraserBrush) {
-      const eraser = new fabric.EraserBrush(window.canvas);
-      eraser.width = parseInt(this.eraserSettings.size);
-      eraser.inverted = this.eraserSettings.invert;
-      window.canvas.freeDrawingBrush = eraser;
-    } else {
-      const eraser = new fabric.PencilBrush(window.canvas);
-      eraser.width = parseInt(this.eraserSettings.size);
-      eraser.color = "rgba(0,0,0,1)";
-      eraser.globalCompositeOperation = "destination-out";
-      window.canvas.freeDrawingBrush = eraser;
+
+    try {
+      // Create a composite eraser using destination-out blend mode
+      const eraserBrush = new fabric.PencilBrush(window.canvas);
+      eraserBrush.width = parseInt(this.eraserSettings.size);
+      eraserBrush.color = this.eraserSettings.invert
+        ? "rgba(0,0,0,1)"
+        : "rgba(255,255,255,1)";
+
+      // Store original path creation method
+      const originalCreatePath = fabric.PencilBrush.prototype._renderPath;
+
+      // Override the internal method to create paths with 'destination-out' blend mode
+      fabric.PencilBrush.prototype._renderPath = function (ctx) {
+        ctx.globalCompositeOperation = "destination-out";
+        originalCreatePath.call(this, ctx);
+        ctx.globalCompositeOperation = "source-over"; // Reset to default
+      };
+
+      // Apply eraser brush to canvas
+      window.canvas.freeDrawingBrush = eraserBrush;
+      window.canvas.isDrawingMode = true;
+
+      // Save the original method so we can restore it later
+      window.canvas._originalCreatePath = originalCreatePath;
+
+      // Add a path complete handler to add the eraser path as a real path
+      if (!window.canvas._pathCreatedHandler) {
+        window.canvas._pathCreatedHandler = (options) => {
+          // Get the current path
+          const path = options.path;
+
+          // Mark this path as an eraser path
+          path.eraserPath = true;
+
+          // Save canvas state after erasing
+          this.saveCanvasState();
+        };
+
+        window.canvas.on("path:created", window.canvas._pathCreatedHandler);
+      }
+    } catch (error) {
+      console.error("Error setting up eraser:", error);
     }
-    window.canvas.isDrawingMode = true;
+  },
+
+  // Clean up when switching tools
+  deactivateDrawingMode() {
+    if (!window.canvas) return;
+
+    // Disable drawing mode
+    window.canvas.isDrawingMode = false;
+
+    // Restore original path creation method if it was overridden by eraser
+    if (window.canvas._originalCreatePath) {
+      fabric.PencilBrush.prototype._renderPath =
+        window.canvas._originalCreatePath;
+      delete window.canvas._originalCreatePath;
+    }
+
+    // Remove path created handler if it exists
+    if (window.canvas._pathCreatedHandler) {
+      window.canvas.off("path:created", window.canvas._pathCreatedHandler);
+      delete window.canvas._pathCreatedHandler;
+    }
+
+    // Clean up eraser event handlers
+    if (window.canvas.__eraser_mousedown) {
+      window.canvas.off("mouse:down", window.canvas.__eraser_mousedown);
+      delete window.canvas.__eraser_mousedown;
+    }
+
+    if (window.canvas.__eraser_mousemove) {
+      window.canvas.off("mouse:move", window.canvas.__eraser_mousemove);
+      delete window.canvas.__eraser_mousemove;
+    }
+
+    if (window.canvas.__eraser_mouseup) {
+      window.canvas.off("mouse:up", window.canvas.__eraser_mouseup);
+      delete window.canvas.__eraser_mouseup;
+    }
   },
 
   // Setup pencil with different brush types
   setupPencil() {
     if (!window.canvas) return;
-    let brush;
-    switch (this.pencilSettings.brushType) {
-      case "Circle":
-        brush = fabric.CircleBrush
-          ? new fabric.CircleBrush(window.canvas)
-          : new fabric.PencilBrush(window.canvas);
-        break;
-      case "Spray":
-        brush = fabric.SprayBrush
-          ? new fabric.SprayBrush(window.canvas)
-          : new fabric.PencilBrush(window.canvas);
-        break;
-      case "hLine":
-      case "vLine":
-      case "square":
-      case "diamond":
-      case "texture":
-        if (fabric.PatternBrush) {
-          brush = new fabric.PatternBrush(window.canvas);
-          brush.getPatternSrc = () => {
-            const patternCanvas = document.createElement("canvas");
-            const ctx = patternCanvas.getContext("2d");
-            patternCanvas.width = patternCanvas.height = 10;
-            ctx.fillStyle = this.pencilSettings.color;
-            switch (this.pencilSettings.brushType) {
-              case "hLine":
-                ctx.fillRect(0, 5, 10, 1);
-                break;
-              case "vLine":
-                ctx.fillRect(5, 0, 1, 10);
-                break;
-              case "square":
-                ctx.fillRect(2, 2, 6, 6);
-                break;
-              case "diamond":
-                ctx.beginPath();
-                ctx.moveTo(5, 0);
-                ctx.lineTo(10, 5);
-                ctx.lineTo(5, 10);
-                ctx.lineTo(0, 5);
-                ctx.closePath();
-                ctx.fill();
-                break;
-              case "texture":
-                ctx.fillRect(1, 1, 2, 2);
-                ctx.fillRect(5, 5, 2, 2);
-                ctx.fillRect(8, 2, 1, 1);
-                ctx.fillRect(2, 8, 1, 1);
-                break;
-            }
-            return patternCanvas;
-          };
-        } else {
+
+    try {
+      let brush;
+      const brushType = this.pencilSettings.brushType;
+      const size = parseInt(this.pencilSettings.size);
+      const color = this.pencilSettings.color;
+
+      // Create brush based on type
+      switch (brushType) {
+        case "Circle":
+          brush =
+            typeof fabric.CircleBrush === "function"
+              ? new fabric.CircleBrush(window.canvas)
+              : new fabric.PencilBrush(window.canvas);
+          break;
+
+        case "Spray":
+          brush =
+            typeof fabric.SprayBrush === "function"
+              ? new fabric.SprayBrush(window.canvas)
+              : new fabric.PencilBrush(window.canvas);
+          break;
+
+        case "hLine":
+        case "vLine":
+        case "square":
+        case "diamond":
+        case "texture":
+          if (typeof fabric.PatternBrush === "function") {
+            brush = new fabric.PatternBrush(window.canvas);
+            brush.getPatternSrc = () => {
+              const patternCanvas = document.createElement("canvas");
+              const ctx = patternCanvas.getContext("2d");
+              patternCanvas.width = patternCanvas.height = 10;
+
+              ctx.fillStyle = color;
+
+              switch (brushType) {
+                case "hLine":
+                  ctx.fillRect(0, 5, 10, 1);
+                  break;
+                case "vLine":
+                  ctx.fillRect(5, 0, 1, 10);
+                  break;
+                case "square":
+                  ctx.fillRect(2, 2, 6, 6);
+                  break;
+                case "diamond":
+                  ctx.beginPath();
+                  ctx.moveTo(5, 0);
+                  ctx.lineTo(10, 5);
+                  ctx.lineTo(5, 10);
+                  ctx.lineTo(0, 5);
+                  ctx.closePath();
+                  ctx.fill();
+                  break;
+                case "texture":
+                  ctx.fillRect(1, 1, 2, 2);
+                  ctx.fillRect(5, 5, 2, 2);
+                  ctx.fillRect(8, 2, 1, 1);
+                  ctx.fillRect(2, 8, 1, 1);
+                  break;
+              }
+
+              return patternCanvas;
+            };
+          } else {
+            brush = new fabric.PencilBrush(window.canvas);
+          }
+          break;
+
+        default:
           brush = new fabric.PencilBrush(window.canvas);
+      }
+
+      // Apply common properties
+      brush.width = size;
+      brush.color = color;
+
+      // Apply shadow if enabled
+      if (parseInt(this.pencilSettings.shadowWidth) > 0) {
+        try {
+          brush.shadow = new fabric.Shadow({
+            blur: parseInt(this.pencilSettings.shadowWidth),
+            offsetX: parseInt(this.pencilSettings.shadowOffsetX),
+            offsetY: parseInt(this.pencilSettings.shadowOffsetY),
+            color: this.pencilSettings.shadowColor,
+          });
+        } catch (error) {
+          console.error("Error setting shadow:", error);
         }
-        break;
-      default:
-        brush = new fabric.PencilBrush(window.canvas);
+      }
+
+      // Apply brush to canvas
+      window.canvas.freeDrawingBrush = brush;
+      window.canvas.isDrawingMode = true;
+    } catch (error) {
+      console.error("Error setting up pencil:", error);
     }
-    brush.width = parseInt(this.pencilSettings.size);
-    brush.color = this.pencilSettings.color;
-    const shadowWidth = parseInt(this.pencilSettings.shadowWidth);
-    if (shadowWidth > 0) {
-      brush.shadow = new fabric.Shadow({
-        blur: shadowWidth,
-        offsetX: parseInt(this.pencilSettings.shadowOffsetX),
-        offsetY: parseInt(this.pencilSettings.shadowOffsetY),
-        color: this.pencilSettings.shadowColor,
-      });
-    } else {
-      brush.shadow = null;
-    }
-    window.canvas.freeDrawingBrush = brush;
-    window.canvas.isDrawingMode = true;
   },
 }));
 // Settings Panel Component
@@ -2448,8 +2804,80 @@ Alpine.data("canvasUtilities", () => ({
 // Initialize everything when the document is loaded
 document.addEventListener("DOMContentLoaded", () => {
   // This will start Alpine.js and initialize all our components
-  initCanvas();
-
-  Alpine.start();
   console.log("Steve Editor initialized!");
 });
+// canvas
+document.addEventListener("alpine:init", () => {
+  Alpine.data("canvasManager", () => ({
+    init() {
+      console.log("Canvas manager initializing...");
+      // this.filteredFonts = [...this.fonts];
+      // Initialize canvas and make it globally available
+      const canvas = new fabric.Canvas(this.$refs.canvas, {
+        preserveObjectStacking: true,
+        width: 800,
+        height: 600,
+      });
+
+      // Make canvas available globally for other components
+      window.canvas = canvas;
+
+      // Set up event listeners to communicate with other components
+      canvas.on("selection:created", this.handleSelection);
+      canvas.on("selection:updated", this.handleSelection);
+      canvas.on("selection:cleared", this.handleSelectionCleared);
+
+      // Dispatch event that canvas is ready
+      window.dispatchEvent(
+        new CustomEvent("canvas:initialized", {
+          detail: { canvas: canvas },
+        })
+      );
+
+      // Listen for tool changes
+      this.listenForToolChanges();
+    },
+
+    handleSelection() {
+      const activeObject = window.canvas.getActiveObject();
+      if (activeObject) {
+        // Dispatch event to notify panels about selection
+        window.dispatchEvent(
+          new CustomEvent("object:selected", {
+            detail: activeObject,
+          })
+        );
+      }
+    },
+
+    handleSelectionCleared() {
+      // Notify panels that selection is cleared
+      window.dispatchEvent(new CustomEvent("selection:cleared"));
+    },
+
+    listenForToolChanges() {
+      window.addEventListener("tool-changed", (e) => {
+        const toolType = e.detail.type;
+
+        // Set drawing mode only when drawing tool is active
+        if (toolType === "drawing") {
+          // Enable drawing mode
+          window.canvas.isDrawingMode = true;
+
+          // Setup a default brush
+          const brush = new fabric.PencilBrush(window.canvas);
+          brush.width = 5;
+          brush.color = "#000000";
+          window.canvas.freeDrawingBrush = brush;
+        } else {
+          // Disable drawing mode for other tools
+          window.canvas.isDrawingMode = false;
+        }
+
+        window.canvas.renderAll();
+      });
+    },
+  }));
+});
+// Start Alpine
+Alpine.start();

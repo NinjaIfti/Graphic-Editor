@@ -1089,16 +1089,17 @@
               <h3 class="text-lg font-medium text-gray-800">Text</h3>
             </div>
 
+            <div x-show="selectedObject && selectedObject.type === 'text'">
+              <input
+                type="text"
+                x-model="selectedObject.text"
+                @input="selectedObject.set('text', $event.target.value); window.canvas.renderAll()"
+                class="w-full p-2 border rounded"
+              />
+            </div>
+
             <!-- Panel Body -->
             <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              <div x-show="selectedObject && selectedObject.type === 'text'">
-                <input
-                  type="text"
-                  x-model="selectedObject.text"
-                  @input="selectedObject.set('text', $event.target.value); window.canvas.renderAll()"
-                  class="w-full p-2 border rounded"
-                />
-              </div>
               <!-- Add Text Button -->
               <button
                 @click="addText()"
@@ -1141,7 +1142,7 @@
 
               <!-- Text Tools -->
               <div
-                x-show="selectedObject && selectedObject.type === 'text'"
+                x-show="selectedObject && (selectedObject.type === 'text' || selectedObject.type === 'curved-text')"
                 class="space-y-4"
               >
                 <!-- Text Modify Buttons -->
@@ -1221,15 +1222,16 @@
                       type="number"
                       class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                       x-model="textProperties.rotation"
+                      @input="updateTextRotation()"
                     />
                   </div>
                   <input
                     type="range"
                     class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     min="0"
-                    max="5000"
-                    value="2500"
-                    @input="updateTextCurve($event.target.value)"
+                    max="360"
+                    x-model="textProperties.rotation"
+                    @input="updateTextRotation()"
                   />
                 </div>
 
@@ -1381,6 +1383,55 @@
                     x-model="textProperties.charSpacing"
                     @input="updateObjectProperty('charSpacing', $event.target.value)"
                   />
+                </div>
+                <!-- Curve Text -->
+                <div class="border border-gray-200 rounded overflow-hidden">
+                  <div
+                    @click="showCurve = !showCurve"
+                    class="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-50"
+                  >
+                    <div class="flex items-center">
+                      <svg
+                        class="w-4 h-4 mr-2 transition-transform duration-200"
+                        :class="showCurve ? 'rotate-90' : ''"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 -960 960 960"
+                      >
+                        <path
+                          fill="currentColor"
+                          d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"
+                        />
+                      </svg>
+                      <span class="text-sm font-medium">Curve Text</span>
+                    </div>
+                  </div>
+
+                  <div
+                    x-show="showCurve"
+                    x-transition
+                    class="p-3 border-t border-gray-200 space-y-3"
+                  >
+                    <!-- Curve Text Slider -->
+                    <div class="space-y-1">
+                      <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium">Curve Angle</span>
+                        <input
+                          type="number"
+                          class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
+                          x-model="curveAngle"
+                          @change="updateCurveFromAngle($event.target.value)"
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        min="0"
+                        max="5000"
+                        x-model="curveValue"
+                        @input="updateTextCurve($event.target.value)"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Distortion -->
@@ -1597,7 +1648,7 @@
                 <!-- Tab Buttons -->
                 <div class="flex space-x-2 border-b border-gray-200">
                   <button
-                    @click="activeTab = 'brush'"
+                    @click="activeTab = 'brush'; updateDrawingMode('brush')"
                     :class="activeTab === 'brush' ? 'bg-gray-100 border-b-2 border-blue-500' : 'hover:bg-gray-50'"
                     class="flex items-center justify-center p-3 rounded-t"
                   >
@@ -1613,7 +1664,7 @@
                     </svg>
                   </button>
                   <button
-                    @click="activeTab = 'eraser'"
+                    @click="activeTab = 'eraser'; updateDrawingMode('eraser')"
                     :class="activeTab === 'eraser' ? 'bg-gray-100 border-b-2 border-blue-500' : 'hover:bg-gray-50'"
                     class="flex items-center justify-center p-3 rounded-t"
                   >
@@ -1629,7 +1680,7 @@
                     </svg>
                   </button>
                   <button
-                    @click="activeTab = 'pencil'"
+                    @click="activeTab = 'pencil'; updateDrawingMode('pencil')"
                     :class="activeTab === 'pencil' ? 'bg-gray-100 border-b-2 border-blue-500' : 'hover:bg-gray-50'"
                     class="flex items-center justify-center p-3 rounded-t"
                   >
@@ -1668,6 +1719,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="brushSettings.size"
+                          @input="setupBrush()"
                           min="1"
                           max="100"
                         />
@@ -1678,7 +1730,8 @@
                         min="1"
                         max="100"
                         x-model="brushSettings.size"
-                        @input="updateBrushPreview()"
+                        @input="setupBrush()"
+                        @change="setupBrush()"
                       />
                     </div>
 
@@ -1690,6 +1743,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="brushSettings.opacity"
+                          @input="setupBrush()"
                           min="0"
                           max="1"
                           step="0.1"
@@ -1702,7 +1756,8 @@
                         max="1"
                         step="0.1"
                         x-model="brushSettings.opacity"
-                        @input="updateBrushPreview()"
+                        @input="setupBrush()"
+                        @change="setupBrush()"
                       />
                     </div>
 
@@ -1716,7 +1771,8 @@
                           type="color"
                           class="w-full h-12 transform -translate-y-1"
                           x-model="brushSettings.color"
-                          @input="updateBrushPreview()"
+                          @input="setupBrush()"
+                          @change="setupBrush()"
                         />
                       </div>
                     </div>
@@ -1735,6 +1791,7 @@
                           id="invert-eraser"
                           class="sr-only peer"
                           x-model="eraserSettings.invert"
+                          @change="setupEraser()"
                         />
                         <label
                           for="invert-eraser"
@@ -1762,6 +1819,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="eraserSettings.size"
+                          @input="setupEraser()"
                           min="1"
                           max="100"
                         />
@@ -1772,6 +1830,8 @@
                         min="1"
                         max="100"
                         x-model="eraserSettings.size"
+                        @input="setupEraser()"
+                        @change="setupEraser()"
                       />
                     </div>
                   </div>
@@ -1805,56 +1865,56 @@
                         class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-y-auto"
                       >
                         <div
-                          @click="pencilSettings.brushType = 'Pencil'; open = false"
+                          @click="pencilSettings.brushType = 'Pencil'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'Pencil' ? 'bg-gray-100' : ''"
                         >
                           Pencil
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'Circle'; open = false"
+                          @click="pencilSettings.brushType = 'Circle'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'Circle' ? 'bg-gray-100' : ''"
                         >
                           Circle
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'Spray'; open = false"
+                          @click="pencilSettings.brushType = 'Spray'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'Spray' ? 'bg-gray-100' : ''"
                         >
                           Spray
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'hLine'; open = false"
+                          @click="pencilSettings.brushType = 'hLine'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'hLine' ? 'bg-gray-100' : ''"
                         >
                           H Line
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'vLine'; open = false"
+                          @click="pencilSettings.brushType = 'vLine'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'vLine' ? 'bg-gray-100' : ''"
                         >
                           V Line
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'square'; open = false"
+                          @click="pencilSettings.brushType = 'square'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'square' ? 'bg-gray-100' : ''"
                         >
                           Square
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'diamond'; open = false"
+                          @click="pencilSettings.brushType = 'diamond'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'diamond' ? 'bg-gray-100' : ''"
                         >
                           Diamond
                         </div>
                         <div
-                          @click="pencilSettings.brushType = 'texture'; open = false"
+                          @click="pencilSettings.brushType = 'texture'; open = false; setupPencil()"
                           class="p-2 hover:bg-gray-100 cursor-pointer"
                           :class="pencilSettings.brushType === 'texture' ? 'bg-gray-100' : ''"
                         >
@@ -1871,6 +1931,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="pencilSettings.size"
+                          @input="setupPencil()"
                           min="1"
                           max="100"
                         />
@@ -1881,6 +1942,8 @@
                         min="1"
                         max="100"
                         x-model="pencilSettings.size"
+                        @input="setupPencil()"
+                        @change="setupPencil()"
                       />
                     </div>
 
@@ -1894,6 +1957,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="pencilSettings.shadowWidth"
+                          @input="setupPencil()"
                           min="0"
                           max="50"
                         />
@@ -1904,6 +1968,8 @@
                         min="0"
                         max="50"
                         x-model="pencilSettings.shadowWidth"
+                        @input="setupPencil()"
+                        @change="setupPencil()"
                       />
                     </div>
 
@@ -1915,6 +1981,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="pencilSettings.shadowOffsetX"
+                          @input="setupPencil()"
                           min="0"
                           max="50"
                         />
@@ -1925,6 +1992,8 @@
                         min="0"
                         max="50"
                         x-model="pencilSettings.shadowOffsetX"
+                        @input="setupPencil()"
+                        @change="setupPencil()"
                       />
                     </div>
 
@@ -1936,6 +2005,7 @@
                           type="number"
                           class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                           x-model="pencilSettings.shadowOffsetY"
+                          @input="setupPencil()"
                           min="0"
                           max="50"
                         />
@@ -1945,7 +2015,9 @@
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                         min="0"
                         max="50"
-                        x-model="pencilSettings.shadowOffsetY"
+                        x-model="pencilSettings.shadowOffsetX"
+                        @input="setupPencil()"
+                        @change="setupPencil()"
                       />
                     </div>
 
@@ -1959,6 +2031,8 @@
                           type="color"
                           class="w-full h-12 transform -translate-y-1"
                           x-model="pencilSettings.color"
+                          @input="setupPencil()"
+                          @change="setupPencil()"
                         />
                       </div>
                     </div>
@@ -1975,6 +2049,8 @@
                           type="color"
                           class="w-full h-12 transform -translate-y-1"
                           x-model="pencilSettings.shadowColor"
+                          @input="setupPencil()"
+                          @change="setupPencil()"
                         />
                       </div>
                     </div>
@@ -2560,11 +2636,22 @@
           </button>
         </div>
 
-        <!-- Canvas -->
-        <canvas id="image-editor" x-ref="canvas" class="w-full h-full"></canvas>
+        <!-- In your HTML, update the canvas container to use this component -->
+        <div
+          x-data="canvasManager"
+          class="border border-gray-300 mx-auto overflow-hidden"
+          style="width: 800px; height: 600px"
+        >
+          <canvas
+            id="image-editor"
+            x-ref="canvas"
+            class="w-full h-full"
+          ></canvas>
+        </div>
       </div>
     </div>
 
     <script type="module" src="/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/circletype@2.3.0/dist/circletype.min.js"></script>
   </body>
 </html>
