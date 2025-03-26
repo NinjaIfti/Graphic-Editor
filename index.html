@@ -2082,7 +2082,6 @@
           <div
             x-data="settingsPanel"
             x-show="isActive"
-            @tool-changed.window="isActive = $event.detail.type === 'settings'"
             class="h-full flex flex-col"
           >
             <!-- Panel Header -->
@@ -2097,21 +2096,12 @@
                 <span class="text-sm font-medium">Canvas Size</span>
 
                 <!-- Canvas Size Dropdown -->
-                <div
-                  x-data="{
-          open: false,
-          search: '',
-          selected: 'TikTok (1080x1920)',
-          value: '1080x1920',
-          filteredSizes: []
-        }"
-                  class="relative"
-                >
+                <div class="relative">
                   <div
                     @click="open = !open"
                     class="flex items-center justify-between p-2 bg-gray-100 rounded cursor-pointer"
                   >
-                    <span x-text="selected">TikTok (1080x1920)</span>
+                    <span x-text="selectedSize">TikTok (1080x1920)</span>
                     <svg
                       class="w-4 h-4 transition-transform"
                       :class="open ? 'rotate-180' : ''"
@@ -2151,7 +2141,7 @@
                         <div
                           @click="selectSize(size); open = false"
                           class="p-2 hover:bg-gray-100 rounded cursor-pointer"
-                          :class="value === size.value ? 'bg-gray-100' : ''"
+                          :class="selectedValue === size.value ? 'bg-gray-100' : ''"
                         >
                           <span x-text="size.name"></span>
                         </div>

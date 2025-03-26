@@ -2139,136 +2139,8 @@ Alpine.data("drawingPanel", () => ({
     }
   },
 }));
-// Settings Panel Component
-Alpine.data("settingsPanel", () => ({
-  isActive: false,
-  customSizeVisible: false,
-  backgroundColor: "#ffffff",
-  customWidth: 1080,
-  customHeight: 1920,
-
-  // Predefined canvas sizes
-  canvasSizes: [
-    { name: "TikTok (1080x1920)", value: "1080x1920", key: "tiktok" },
-    { name: "YouTube (1280x720)", value: "1280x720", key: "youtube" },
-    { name: "Facebook Post (1200x630)", value: "1200x630", key: "fb-post" },
-    { name: "Instagram Post (1080x1080)", value: "1080x1080", key: "ig-post" },
-    {
-      name: "Instagram Story (1080x1920)",
-      value: "1080x1920",
-      key: "ig-story",
-    },
-    { name: "Facebook Cover (820x312)", value: "820x312", key: "fb-cover" },
-    { name: "LinkedIn Post (1200x1200)", value: "1200x1200", key: "li-post" },
-    { name: "LinkedIn Cover (1584x396)", value: "1584x396", key: "li-cover" },
-    { name: "Twitter Header (1500x500)", value: "1500x500", key: "twitter" },
-    { name: "Snapchat Story (1080x1920)", value: "1080x1920", key: "snapchat" },
-    {
-      name: "YouTube Channel Art (2560x1440)",
-      value: "2560x1440",
-      key: "yt-art",
-    },
-    { name: "Pinterest Pin (1600x900)", value: "1600x900", key: "pinterest" },
-    { name: "Custom", value: "custom", key: "custom" },
-  ],
-  filteredSizes: [],
-  search: "",
-  selectedSize: "TikTok (1080x1920)",
-  selectedValue: "1080x1920",
-
-  init() {
-    // Listen for tool changes
-    window.addEventListener("tool-changed", (e) => {
-      this.isActive = e.detail.type === "settings";
-
-      // Initialize with current canvas settings if available
-      if (this.isActive && window.canvas) {
-        this.backgroundColor = window.canvas.backgroundColor || "#ffffff";
-      }
-    });
-  },
-
-  // Filter sizes based on search
-  filterSizes() {
-    if (!this.search) {
-      this.filteredSizes = this.canvasSizes;
-      return;
-    }
-
-    this.filteredSizes = this.canvasSizes.filter((size) =>
-      size.name.toLowerCase().includes(this.search.toLowerCase())
-    );
-  },
-
-  // Select a size from the dropdown
-  selectSize(size) {
-    this.selectedSize = size.name;
-    this.selectedValue = size.value;
-
-    if (size.value === "custom") {
-      this.customSizeVisible = true;
-      return;
-    }
-
-    this.customSizeVisible = false;
-
-    // Parse dimensions from the value (format: "WidthxHeight")
-    const [width, height] = size.value.split("x").map(Number);
-
-    // Apply size to canvas
-    this.resizeCanvas(width, height);
-  },
-
-  // Apply custom size
-  applyCustomSize() {
-    if (!this.customWidth || !this.customHeight) return;
-
-    this.resizeCanvas(this.customWidth, this.customHeight);
-  },
-
-  // Resize the canvas to specified dimensions
-  resizeCanvas(width, height) {
-    if (!window.canvas) return;
-
-    // Get current objects and canvas state
-    const objects = window.canvas.getObjects();
-    const currentWidth = window.canvas.width;
-    const currentHeight = window.canvas.height;
-
-    // Set new canvas dimensions
-    window.canvas.setWidth(width);
-    window.canvas.setHeight(height);
-
-    // Adjust objects if needed (scale or reposition)
-    if (objects.length > 0) {
-      // Simple approach: center all content
-      const selection = new fabric.ActiveSelection(objects, {
-        canvas: window.canvas,
-      });
-      selection.center();
-      window.canvas.discardActiveObject();
-    }
-
-    // Trigger a canvas resize event
-    window.dispatchEvent(
-      new CustomEvent("canvas:resized", {
-        detail: { width, height },
-      })
-    );
-
-    window.canvas.renderAll();
-  },
-
-  // Update background color
-  updateBackgroundColor() {
-    if (!window.canvas) return;
-
-    window.canvas.setBackgroundColor(this.backgroundColor, () => {
-      window.canvas.renderAll();
-    });
-  },
-}));
-// Layers Panel Component
+// Layers Panel Component - Corrected Version
+// Layers Panel Component - Compatible Version
 Alpine.data("layersPanel", () => ({
   isActive: false,
   layers: [],
@@ -2278,8 +2150,6 @@ Alpine.data("layersPanel", () => ({
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
       this.isActive = e.detail.type === "layers";
-
-      // Update layers when becoming active
       if (this.isActive) {
         this.updateLayers();
       }
@@ -2289,10 +2159,14 @@ Alpine.data("layersPanel", () => ({
     window.addEventListener("object:added", () => this.updateLayers());
     window.addEventListener("object:removed", () => this.updateLayers());
     window.addEventListener("object:modified", () => this.updateLayers());
+    window.addEventListener("canvas:updated", () => this.updateLayers());
 
     // Listen for selection changes
     window.addEventListener("object:selected", (e) => {
-      if (e.detail && e.detail.id) {
+      if (e.detail) {
+        if (!e.detail.id) {
+          e.detail.id = this.generateId();
+        }
         this.selectedLayerId = e.detail.id;
       }
     });
@@ -2300,6 +2174,9 @@ Alpine.data("layersPanel", () => ({
     window.addEventListener("selection:cleared", () => {
       this.selectedLayerId = null;
     });
+
+    // Initial layer update
+    this.updateLayers();
   },
 
   // Update the layers list from canvas objects
@@ -2307,18 +2184,28 @@ Alpine.data("layersPanel", () => ({
     if (!window.canvas) return;
 
     const objects = window.canvas.getObjects();
+
+    // Assign IDs to objects that don't have them
+    objects.forEach((obj) => {
+      if (!obj.id) {
+        obj.id = this.generateId();
+      }
+    });
+
     this.layers = objects
-      .map((obj) => ({
-        id: obj.id || this.generateId(),
+      .map((obj, idx) => ({
+        id: obj.id,
         name: obj.name || this.getObjectTypeName(obj),
         type: obj.type,
-        visible: !obj.invisible,
+        visible: obj.visible !== false, // Use obj.visible, default to true
         object: obj,
       }))
-      .reverse(); // Reverse to match visual stacking order
+      .reverse(); // Top layer at index 0
+
+    console.log("Layers updated:", this.layers);
   },
 
-  // Generate a unique ID for objects that don't have one
+  // Generate a unique ID for objects
   generateId() {
     return "_" + Math.random().toString(36).substr(2, 9);
   },
@@ -2327,8 +2214,10 @@ Alpine.data("layersPanel", () => ({
   getObjectTypeName(obj) {
     switch (obj.type) {
       case "text":
-        return `Text: ${obj.text.substr(0, 15)}${
-          obj.text.length > 15 ? "..." : ""
+        return `Text: ${
+          obj.text
+            ? obj.text.substr(0, 15) + (obj.text.length > 15 ? "..." : "")
+            : "Text"
         }`;
       case "image":
         return "Image";
@@ -2338,6 +2227,8 @@ Alpine.data("layersPanel", () => ({
         return "Circle";
       case "path":
         return "Drawing";
+      case "group":
+        return "Group";
       default:
         return `Layer ${this.layers.length + 1}`;
     }
@@ -2362,47 +2253,149 @@ Alpine.data("layersPanel", () => ({
     window.canvas.renderAll();
   },
 
-  // Move layer up in stacking order
+  // Move layer up (toward front)
   moveLayerUp(index) {
-    if (!window.canvas || index === 0) return;
+    if (!window.canvas || index === 0) return; // Top layer can't move up
 
-    // Get the actual objects from canvas (reverse to match our display order)
-    const objects = window.canvas.getObjects().slice().reverse();
-    const objectToMove = objects[index];
+    try {
+      const objects = window.canvas.getObjects();
+      // The real index in the canvas objects array
+      const canvasIndex = objects.length - 1 - index;
 
-    // Move in the canvas (bring forward)
-    window.canvas.bringForward(objectToMove);
+      if (canvasIndex < objects.length - 1) {
+        // Get the object to move
+        const objectToMove = objects[canvasIndex];
 
-    // Update our layer array to reflect change
-    this.updateLayers();
+        // Create a new array with the object moved one position higher
+        const newObjects = [...objects];
+        newObjects.splice(canvasIndex, 1); // Remove from current position
+        newObjects.splice(canvasIndex + 1, 0, objectToMove); // Insert at new position
+
+        // Clear canvas and re-add objects in the new order
+        window.canvas.clear();
+        newObjects.forEach((obj) => window.canvas.add(obj));
+
+        window.canvas.renderAll();
+        this.updateLayers();
+
+        console.log("Layer moved up:", index);
+      }
+    } catch (error) {
+      console.error("Error moving layer up:", error);
+    }
   },
 
-  // Move layer down in stacking order
+  // Move layer down (toward back)
   moveLayerDown(index) {
-    if (!window.canvas || index === this.layers.length - 1) return;
+    if (!window.canvas || index === this.layers.length - 1) return; // Bottom layer can't move down
 
-    // Get the actual objects from canvas (reverse to match our display order)
-    const objects = window.canvas.getObjects().slice().reverse();
-    const objectToMove = objects[index];
+    try {
+      const objects = window.canvas.getObjects();
+      // The real index in the canvas objects array
+      const canvasIndex = objects.length - 1 - index;
 
-    // Move in the canvas (send backward)
-    window.canvas.sendBackwards(objectToMove);
+      if (canvasIndex > 0) {
+        // Get the object to move
+        const objectToMove = objects[canvasIndex];
 
-    // Update our layer array to reflect change
-    this.updateLayers();
+        // Create a new array with the object moved one position lower
+        const newObjects = [...objects];
+        newObjects.splice(canvasIndex, 1); // Remove from current position
+        newObjects.splice(canvasIndex - 1, 0, objectToMove); // Insert at new position
+
+        // Clear canvas and re-add objects in the new order
+        window.canvas.clear();
+        newObjects.forEach((obj) => window.canvas.add(obj));
+
+        window.canvas.renderAll();
+        this.updateLayers();
+
+        console.log("Layer moved down:", index);
+      }
+    } catch (error) {
+      console.error("Error moving layer down:", error);
+    }
   },
 
-  // Delete a layer
+  // Delete a layer - new implementation using object ID
   deleteLayer(layer) {
-    if (!window.canvas) return;
+    if (!window.canvas || !layer) {
+      console.error("Cannot delete layer: Invalid layer");
+      return;
+    }
 
-    // Remove from canvas
-    window.canvas.remove(layer.object);
+    try {
+      // Get all canvas objects
+      const objects = window.canvas.getObjects();
 
-    // Update layers
-    this.updateLayers();
+      // Find the object on the canvas by its ID
+      const objectId = layer.id;
+      let objectToRemove = null;
+
+      // First try to find the exact object reference
+      let objectIndex = objects.indexOf(layer.object);
+
+      // If direct reference not found, find by ID
+      if (objectIndex === -1) {
+        for (let i = 0; i < objects.length; i++) {
+          if (objects[i].id === objectId) {
+            objectToRemove = objects[i];
+            objectIndex = i;
+            break;
+          }
+        }
+      } else {
+        objectToRemove = layer.object;
+      }
+
+      if (objectToRemove) {
+        console.log(
+          "Found object to delete:",
+          objectId,
+          "at index:",
+          objectIndex
+        );
+
+        // If this is the currently selected object, clear the selection first
+        if (this.selectedLayerId === objectId) {
+          window.canvas.discardActiveObject();
+          this.selectedLayerId = null;
+        }
+
+        // Remove the object from canvas
+        window.canvas.remove(objectToRemove);
+        window.canvas.renderAll();
+
+        // Update the layers list
+        this.updateLayers();
+
+        console.log("Layer deleted successfully");
+      } else {
+        console.error("Object with ID not found in canvas:", objectId);
+
+        // As a last resort, try removing directly using a new approach
+        if (typeof window.canvas._objects !== "undefined") {
+          console.log("Attempting alternate deletion method");
+
+          // Try to find the object in the internal _objects array
+          for (let i = 0; i < window.canvas._objects.length; i++) {
+            if (window.canvas._objects[i].id === objectId) {
+              // Remove it directly from the _objects array
+              window.canvas._objects.splice(i, 1);
+              window.canvas.renderAll();
+              this.updateLayers();
+              console.log("Layer deleted using alternate method");
+              break;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error deleting layer:", error);
+    }
   },
 }));
+
 // Clip Arts Panel Component
 Alpine.data("clipArtsPanel", () => ({
   isActive: false,
