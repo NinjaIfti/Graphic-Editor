@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Title</title>
+    <title>Graphic Editor</title>
     <link href="/css/app.css" rel="stylesheet" />
   </head>
   <body>
@@ -769,7 +769,10 @@
                       type="number"
                       class="w-12 bg-gray-100 rounded text-center px-1 py-0.5 text-sm"
                       x-model="objectProperties.opacity"
-                      readonly
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      @input="updateObjectProperty('opacity', $event.target.value)"
                     />
                   </div>
                   <input
@@ -802,7 +805,10 @@
                         type="number"
                         class="w-12 bg-gray-100 rounded text-center px-1 py-0.5 text-sm"
                         x-model="objectProperties.strokeWidth"
-                        readonly
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        @input="updateObjectProperty('strokeWidth', $event.target.value)"
                       />
                     </div>
                   </div>
@@ -825,14 +831,17 @@
                       type="number"
                       class="w-12 bg-gray-100 rounded text-center px-1 py-0.5 text-sm"
                       x-model="objectProperties.radius"
-                      readonly
+                      min="0"
+                      max="50"
+                      step="1"
+                      @input="updateClipPath($event.target.value)"
                     />
                   </div>
                   <input
                     type="range"
                     class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     min="0"
-                    max="100"
+                    max="50"
                     step="1"
                     x-model="objectProperties.radius"
                     @input="updateClipPath($event.target.value)"
@@ -866,41 +875,51 @@
                     x-transition
                     class="p-3 border-t border-gray-200 space-y-3"
                   >
-                    <!-- SkewX -->
+                    <!-- Skew X -->
                     <div class="space-y-1">
                       <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium">SkewX</span>
+                        <span class="text-sm font-medium">Skew X</span>
                         <input
-                          type="text"
+                          type="number"
                           class="w-12 bg-gray-100 rounded text-center px-1 py-0.5 text-sm"
                           x-model="objectProperties.skewX"
+                          min="-50"
+                          max="50"
+                          step="1"
+                          @input="updateObjectProperty('skewX', $event.target.value)"
                         />
                       </div>
                       <input
                         type="range"
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        min="0"
-                        max="180"
+                        min="-50"
+                        max="50"
+                        step="1"
                         x-model="objectProperties.skewX"
                         @input="updateObjectProperty('skewX', $event.target.value)"
                       />
                     </div>
 
-                    <!-- SkewY -->
+                    <!-- Skew Y -->
                     <div class="space-y-1">
                       <div class="flex justify-between items-center">
-                        <span class="text-sm font-medium">SkewY</span>
+                        <span class="text-sm font-medium">Skew Y</span>
                         <input
-                          type="text"
+                          type="number"
                           class="w-12 bg-gray-100 rounded text-center px-1 py-0.5 text-sm"
                           x-model="objectProperties.skewY"
+                          min="-50"
+                          max="50"
+                          step="1"
+                          @input="updateObjectProperty('skewY', $event.target.value)"
                         />
                       </div>
                       <input
                         type="range"
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        min="0"
-                        max="180"
+                        min="-50"
+                        max="50"
+                        step="1"
                         x-model="objectProperties.skewY"
                         @input="updateObjectProperty('skewY', $event.target.value)"
                       />
@@ -1302,7 +1321,7 @@
                       type="number"
                       class="w-16 bg-gray-100 rounded text-center px-2 py-1 text-sm"
                       x-model="textProperties.fontSize"
-                      @input="updateObjectProperty('fontSize', $event.target.value)"
+                      @input="updateTextProperty('fontSize', $event.target.value)"
                       min="2"
                     />
                   </div>
@@ -1326,7 +1345,7 @@
                     max="1"
                     step="0.1"
                     x-model="textProperties.opacity"
-                    @input="updateObjectProperty('opacity', $event.target.value)"
+                    @input="updateTextProperty('opacity', $event.target.value)"
                   />
                 </div>
 
@@ -1342,7 +1361,7 @@
                           type="color"
                           class="w-8 h-8 transform -translate-x-1 -translate-y-1"
                           x-model="textProperties.stroke"
-                          @input="updateObjectProperty('stroke', $event.target.value)"
+                          @input="updateTextProperty('stroke', $event.target.value)"
                         />
                       </div>
                       <input
@@ -1360,7 +1379,7 @@
                     max="2"
                     step="0.1"
                     x-model="textProperties.strokeWidth"
-                    @input="updateObjectProperty('strokeWidth', $event.target.value)"
+                    @input="updateTextProperty('strokeWidth', $event.target.value)"
                   />
                 </div>
 
@@ -1381,7 +1400,7 @@
                     min="0"
                     max="500"
                     x-model="textProperties.charSpacing"
-                    @input="updateObjectProperty('charSpacing', $event.target.value)"
+                    @input="updateTextProperty('charSpacing', $event.target.value)"
                   />
                 </div>
                 <!-- Curve Text -->
@@ -1477,7 +1496,7 @@
                         min="0"
                         max="180"
                         x-model="textProperties.skewX"
-                        @input="updateObjectProperty('skewX', $event.target.value)"
+                        @input="updateTextProperty('skewX', $event.target.value)"
                       />
                     </div>
 
@@ -1497,7 +1516,7 @@
                         min="0"
                         max="180"
                         x-model="textProperties.skewY"
-                        @input="updateObjectProperty('skewY', $event.target.value)"
+                        @input="updateTextProperty('skewY', $event.target.value)"
                       />
                     </div>
                   </div>

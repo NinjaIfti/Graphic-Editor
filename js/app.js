@@ -942,11 +942,27 @@ Alpine.data("textPanel", () => ({
     window.canvas.renderAll();
   },
 
-  // Update text rotation
   updateTextRotation() {
     if (!this.selectedObject || !window.canvas) return;
 
-    this.selectedObject.set("angle", this.textProperties.rotation);
+    // Store the current position of the object
+    const currentLeft = this.selectedObject.left;
+    const currentTop = this.selectedObject.top;
+
+    // Set the rotation origin to the center of the object
+    this.selectedObject.set({
+      angle: this.textProperties.rotation,
+      originX: "center",
+      originY: "center",
+    });
+
+    // Ensure the object remains in the same position after rotation
+    this.selectedObject.set({
+      left: currentLeft,
+      top: currentTop,
+    });
+
+    // Re-render the canvas
     window.canvas.renderAll();
   },
 
@@ -1259,6 +1275,7 @@ Alpine.data("textPanel", () => ({
     window.canvas.renderAll();
   },
 }));
+
 // Uploads Panel Component
 Alpine.data("uploadsPanel", () => ({
   isActive: false,
@@ -1561,31 +1578,66 @@ Alpine.data("uploadsPanel", () => ({
     window.canvas.renderAll();
   },
 
-  // Update object property
   updateObjectProperty(property, value) {
-    if (!this.selectedObject || !window.canvas) return;
-
-    // Convert value types appropriately
-    let finalValue = value;
-    if (typeof this.selectedObject[property] === "number") {
-      finalValue = parseFloat(value);
+    // Ensure we have a selected object and canvas
+    if (!this.selectedObject || !window.canvas) {
+      console.error("No selected object or canvas available");
+      return;
     }
 
-    // Set the property
+    console.log(`Updating ${property} to ${value}`); // Debug to confirm triggering
+
+    // Convert value based on property type
+    let finalValue;
+    switch (property) {
+      case "opacity":
+      case "strokeWidth":
+      case "skewX":
+      case "skewY":
+        finalValue = parseFloat(value);
+        if (isNaN(finalValue)) {
+          console.warn(`Invalid number for ${property}: ${value}`);
+          return;
+        }
+        break;
+      case "stroke":
+      case "fill":
+        finalValue = value; // Colors are strings
+        break;
+      default:
+        console.warn(`Unhandled property: ${property}`);
+        finalValue = value; // Default to raw value
+        break;
+    }
+
+    // Apply the property to the selected object
     this.selectedObject.set(property, finalValue);
 
-    // Update local state
-    this.objectProperties[property] = finalValue;
+    // Update local state (objectProperties)
+    if (property in this.objectProperties) {
+      this.objectProperties[property] = finalValue;
+    } else {
+      console.warn(`Property ${property} not in objectProperties`);
+    }
 
-    // Render the canvas
+    // Special handling for radius (if called directly, though typically via updateClipPath)
+    if (property === "radius") {
+      this.updateClipPath(finalValue);
+    }
+
+    // Re-render the canvas
     window.canvas.renderAll();
   },
 
-  // Update radius (clip path)
   updateClipPath(value) {
     if (!this.selectedObject || !window.canvas) return;
 
     const radius = parseInt(value, 10);
+    if (isNaN(radius)) {
+      console.warn(`Invalid radius value: ${value}`);
+      return;
+    }
+
     this.objectProperties.radius = radius;
 
     if (radius === 0) {
