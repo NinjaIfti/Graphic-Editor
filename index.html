@@ -156,41 +156,49 @@
         <!-- Logo Section -->
         <h4 class="text-lg font-semibold text-gray-800">Steve Editor</h4>
 
-        <div class="flex gap-3">
-          <!-- Export Buttons -->
-          <button
-            @click="downloadCanvas('png')"
-            class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-          >
-            <svg
-              class="w-4 h-4 text-gray-700"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 -960 960 960"
-            >
-              <path
-                fill="currentColor"
-                d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
-              />
-            </svg>
-            <span class="text-gray-800">PNG</span>
-          </button>
+        <div
+          class="bg-white shadow-md px-4 py-3 flex items-center justify-between"
+          x-data="exportFunctions"
+        >
+          <div class="flex items-center justify-between w-full">
+            <!-- Logo Section -->
+            <div class="flex gap-3">
+              <!-- Export Buttons -->
+              <button
+                @click="downloadCanvas('png')"
+                class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <svg
+                  class="w-4 h-4 text-gray-700"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 -960 960 960"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
+                  />
+                </svg>
+                <span class="text-gray-800">PNG</span>
+              </button>
 
-          <button
-            @click="downloadCanvas('jpg')"
-            class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-          >
-            <svg
-              class="w-4 h-4 text-gray-700"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 -960 960 960"
-            >
-              <path
-                fill="currentColor"
-                d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
-              />
-            </svg>
-            <span class="text-gray-800">JPG</span>
-          </button>
+              <button
+                @click="downloadCanvas('jpg')"
+                class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <svg
+                  class="w-4 h-4 text-gray-700"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 -960 960 960"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
+                  />
+                </svg>
+                <span class="text-gray-800">JPG</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
