@@ -407,7 +407,7 @@
               <div class="text-center text-gray-700">No templates found!</div>
             </div>
           </div>
-          <!-- UploadsPanel -->
+          <!-- UploadsPanel -->=
           <div
             x-data="uploadsPanel"
             x-show="isActive"
@@ -492,7 +492,7 @@
                   >
                     <!-- Black White -->
                     <div
-                      @click="applyPresetFilter('black_white')"
+                      @click="applyCustomFilter('black_white')"
                       :class="activeFilter === 'black_white' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -508,7 +508,7 @@
 
                     <!-- Brownie -->
                     <div
-                      @click="applyPresetFilter('brownie')"
+                      @click="applyCustomFilter('brownie')"
                       :class="activeFilter === 'brownie' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -524,7 +524,7 @@
 
                     <!-- Grayscale -->
                     <div
-                      @click="applyPresetFilter('grayscale')"
+                      @click="applyCustomFilter('grayscale')"
                       :class="activeFilter === 'grayscale' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -540,7 +540,7 @@
 
                     <!-- Invert -->
                     <div
-                      @click="applyPresetFilter('invert')"
+                      @click="applyCustomFilter('invert')"
                       :class="activeFilter === 'invert' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -556,7 +556,7 @@
 
                     <!-- Sepia -->
                     <div
-                      @click="applyPresetFilter('sepia')"
+                      @click="applyCustomFilter('sepia')"
                       :class="activeFilter === 'sepia' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -572,7 +572,7 @@
 
                     <!-- Kodachrome -->
                     <div
-                      @click="applyPresetFilter('kodachrome')"
+                      @click="applyCustomFilter('kodachrome')"
                       :class="activeFilter === 'kodachrome' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -588,7 +588,7 @@
 
                     <!-- Technicolor -->
                     <div
-                      @click="applyPresetFilter('technicolor')"
+                      @click="applyCustomFilter('technicolor')"
                       :class="activeFilter === 'technicolor' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -604,7 +604,7 @@
 
                     <!-- Sharpen -->
                     <div
-                      @click="applyPresetFilter('sharpen')"
+                      @click="applyCustomFilter('sharpen')"
                       :class="activeFilter === 'sharpen' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -620,7 +620,7 @@
 
                     <!-- Polaroid -->
                     <div
-                      @click="applyPresetFilter('polaroid')"
+                      @click="applyCustomFilter('polaroid')"
                       :class="activeFilter === 'polaroid' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -636,7 +636,7 @@
 
                     <!-- Emboss -->
                     <div
-                      @click="applyPresetFilter('emboss')"
+                      @click="applyCustomFilter('emboss')"
                       :class="activeFilter === 'emboss' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -652,7 +652,7 @@
 
                     <!-- Vintage -->
                     <div
-                      @click="applyPresetFilter('vintage')"
+                      @click="applyCustomFilter('vintage')"
                       :class="activeFilter === 'vintage' ? 'ring-2 ring-blue-500' : ''"
                       class="flex flex-col items-center min-w-[80px] cursor-pointer"
                     >
@@ -2225,6 +2225,7 @@
               </div>
             </div>
           </div>
+
           <!-- Layers Panel -->
           <div
             x-data="layersPanel"

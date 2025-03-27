@@ -3,9 +3,13 @@
 // Import required libraries
 import Alpine from "alpinejs";
 import * as fabric from "fabric";
-import { CurvedText, getRangeFromPercentage } from "./curved-text.js";
+import { CurvedText, getRangeFromPercentage } from "./tools/curved-text.js";
+
 // Make Alpine globally available
 window.Alpine = Alpine;
+
+window.fabric = fabric; // Make fabric globally available
+import "./filters/fabric-filters-polyfill.js";
 
 // Global function to download canvas in specified format
 window.downloadCanvas = function (format) {
@@ -1372,7 +1376,7 @@ Alpine.data("textPanel", () => ({
   },
 }));
 
-// Uploads Panel Component
+// uploads panel
 Alpine.data("uploadsPanel", () => ({
   isActive: false,
   uploads: [],
@@ -1381,6 +1385,9 @@ Alpine.data("uploadsPanel", () => ({
   showFilterTools: false,
   showShadow: false,
   showDistortion: false,
+  filterAvailable: false, // Track filter availability
+  originalImage: null, // Store original image for filter resets
+  // debounceTimers: {}, // Store debounce timers for filter operations
 
   // Image filter properties
   filters: {
@@ -1410,87 +1417,325 @@ Alpine.data("uploadsPanel", () => ({
   },
 
   init() {
+    console.log("Uploads panel initializing");
+
+    // Check if fabric is available and has filters
+    this.checkFilterAvailability();
     // Listen for tool changes
     window.addEventListener("tool-changed", (e) => {
+      console.log("Tool changed event received:", e.detail);
       this.isActive = e.detail.type === "uploads";
+
+      // Check filter availability when panel becomes active
+      if (this.isActive) {
+        this.checkFilterAvailability();
+      }
     });
 
     // Listen for object selection
     window.addEventListener("object:selected", (e) => {
+      console.log("Object selected event received:", e.detail);
       if (e.detail) {
         this.selectedObject = e.detail;
         this.syncObjectProperties();
+
+        // Reset original image reference when selecting a new object
+        this.originalImage = null;
       }
     });
 
     // Listen for selection cleared
     window.addEventListener("selection:cleared", () => {
+      console.log("Selection cleared event received");
       this.selectedObject = null;
+      this.originalImage = null;
     });
+
+    console.log("Uploads panel initialization complete");
+  },
+
+  // Check if fabric.js filters are available
+  checkFilterAvailability() {
+    // Check if fabric exists
+    if (typeof fabric === "undefined") {
+      console.warn("Fabric.js is not available");
+      this.filterAvailable = false;
+      return;
+    }
+
+    // Check if fabric.Image exists
+    if (!fabric.Image) {
+      console.warn("Fabric.Image is not available");
+      this.filterAvailable = false;
+      return;
+    }
+
+    // Check if filters are available
+    if (!fabric.Image.filters) {
+      console.warn(
+        "Fabric.Image.filters is not available - filters won't work"
+      );
+      this.filterAvailable = false;
+      return;
+    }
+
+    console.log("Fabric filters are available:", fabric.Image.filters);
+    this.filterAvailable = true;
+
+    // Optional: Log available filters
+    const availableFilters = [];
+    for (const filter in fabric.Image.filters) {
+      availableFilters.push(filter);
+    }
+    console.log("Available filters:", availableFilters);
   },
 
   // Handle file uploads
   handleFileUpload(event) {
+    console.log("File upload triggered");
     const files = event.target.files;
-    if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      if (!file.type.match("image.*")) return;
+    if (!files || files.length === 0) {
+      console.warn("No files selected");
+      return;
+    }
+
+    console.log("Files selected:", files.length);
+
+    Array.from(files).forEach((file, index) => {
+      console.log(
+        `Processing file ${index + 1}/${files.length}:`,
+        file.name,
+        file.type,
+        file.size + "bytes"
+      );
+
+      if (!file.type.match("image.*")) {
+        console.warn(`File ${file.name} is not an image, skipping`);
+        return;
+      }
 
       const reader = new FileReader();
+
       reader.onload = (e) => {
+        console.log(`File ${file.name} loaded successfully`);
         const imgURL = e.target.result;
+        console.log(`Image URL (truncated): ${imgURL.substring(0, 30)}...`);
+
         this.uploads.push({
           url: imgURL,
           name: file.name,
         });
+        console.log(
+          `Added to uploads array, total count: ${this.uploads.length}`
+        );
 
         // Add to the grid
         const container = document.getElementById("file-upload-con");
         if (container) {
+          console.log("Upload container found, adding visual element");
           const imgElement = document.createElement("div");
           imgElement.className =
             "aspect-square border border-gray-200 rounded overflow-hidden";
           imgElement.innerHTML = `<img src="${imgURL}" alt="${file.name}" class="w-full h-full object-cover cursor-pointer">`;
-          imgElement.onclick = () => this.addImageToCanvas(imgURL);
+
+          // Store reference to this for closure
+          const self = this;
+          imgElement.onclick = function () {
+            console.log(`Image clicked: ${file.name}`);
+            self.addImageToCanvas(imgURL);
+          };
+
           container.appendChild(imgElement);
+          console.log("Image added to visual grid");
+        } else {
+          console.error("Upload container element not found!");
         }
       };
+
+      reader.onerror = (error) => {
+        console.error(`Error reading file ${file.name}:`, error);
+      };
+
+      console.log(`Starting to read file ${file.name} as data URL`);
       reader.readAsDataURL(file);
     });
   },
 
   // Add an image to the canvas
   addImageToCanvas(url) {
-    if (!window.canvas) return;
+    console.log("=== addImageToCanvas START ===");
+    console.log("URL format (truncated):", url.substring(0, 40) + "...");
 
-    fabric.Image.fromURL(url, (img) => {
-      // Scale down large images
-      if (img.width > 800 || img.height > 600) {
-        const scale = Math.min(800 / img.width, 600 / img.height);
-        img.scale(scale);
-      }
+    // Check if fabric is available
+    if (typeof fabric === "undefined") {
+      console.error("Fabric.js is not available!");
+      return;
+    }
 
-      window.canvas.add(img);
-      window.canvas.setActiveObject(img);
-      window.canvas.renderAll();
+    // Check canvas availability
+    console.log("Canvas availability check:", !!window.canvas);
+    if (!window.canvas) {
+      console.error("Canvas not available");
+      return;
+    }
 
-      this.selectedObject = img;
-      this.syncObjectProperties();
-    });
+    // Check filter availability
+    this.checkFilterAvailability();
+
+    console.log(
+      "Canvas dimensions:",
+      window.canvas.width,
+      "x",
+      window.canvas.height
+    );
+    console.log(
+      "Canvas objects before adding:",
+      window.canvas.getObjects().length
+    );
+
+    try {
+      // Store reference to 'this' for use in callbacks
+      const self = this;
+
+      // Create a native DOM Image element first
+      console.log("Creating DOM Image element");
+      const imgElement = new Image();
+
+      // Set up load event handler
+      imgElement.onload = function () {
+        console.log(
+          "DOM Image loaded successfully:",
+          this.width,
+          "x",
+          this.height
+        );
+
+        try {
+          // Create Fabric.js Image object from the DOM Image
+          console.log("Creating Fabric.js Image from DOM element");
+          const fabricImage = new fabric.Image(imgElement, {
+            left: window.canvas.width / 2,
+            top: window.canvas.height / 2,
+            originX: "center",
+            originY: "center",
+            name: "Uploaded Image",
+          });
+
+          console.log("Fabric Image created with properties:", {
+            width: fabricImage.width,
+            height: fabricImage.height,
+            type: fabricImage.type,
+          });
+
+          // Define maximum dimensions for images
+          const maxWidth = 400;
+          const maxHeight = 300;
+
+          console.log(
+            "Original dimensions:",
+            fabricImage.width,
+            "x",
+            fabricImage.height
+          );
+
+          // Calculate scale factor to fit within maximum dimensions
+          const scaleX = maxWidth / fabricImage.width;
+          const scaleY = maxHeight / fabricImage.height;
+          const scale = Math.min(scaleX, scaleY, 1); // Use 1 as max to avoid upscaling small images
+
+          // Apply scaling
+          console.log("Scaling by factor:", scale);
+          fabricImage.scale(scale);
+          console.log(
+            "Scaled dimensions:",
+            fabricImage.width * scale,
+            "x",
+            fabricImage.height * scale
+          );
+
+          // Add to canvas with exception handling
+          try {
+            console.log("Adding Fabric Image to canvas...");
+            window.canvas.add(fabricImage);
+            console.log("Image added to canvas");
+            console.log(
+              "Canvas objects after adding:",
+              window.canvas.getObjects().length
+            );
+
+            try {
+              console.log("Setting as active object...");
+              window.canvas.setActiveObject(fabricImage);
+              console.log("Active object set");
+              console.log(
+                "Is image now active:",
+                window.canvas.getActiveObject() === fabricImage
+              );
+            } catch (activeError) {
+              console.error("Error setting active object:", activeError);
+            }
+
+            try {
+              console.log("Rendering canvas...");
+              window.canvas.renderAll();
+              console.log("Canvas rendered");
+            } catch (renderError) {
+              console.error("Error rendering canvas:", renderError);
+            }
+
+            console.log("Image should now be visible on canvas");
+
+            // Update the component state
+            self.selectedObject = fabricImage;
+            self.syncObjectProperties();
+            console.log("Object properties synchronized");
+          } catch (addError) {
+            console.error("Error adding Fabric Image to canvas:", addError);
+          }
+        } catch (fabricError) {
+          console.error("Error creating Fabric Image:", fabricError);
+        }
+      };
+
+      // Set up error event handler
+      imgElement.onerror = function (error) {
+        console.error("Error loading DOM Image:", error);
+      };
+
+      // Set a crossOrigin attribute to handle potential CORS issues
+      imgElement.crossOrigin = "anonymous";
+
+      // Actually start loading the image
+      console.log("Setting image src to trigger loading...");
+      imgElement.src = url;
+    } catch (e) {
+      console.error("Exception in overall image loading process:", e);
+    }
+
+    console.log("=== addImageToCanvas END ===");
   },
 
   // Synchronize object properties
   syncObjectProperties() {
-    if (!this.selectedObject) return;
+    console.log("Synchronizing object properties");
+    if (!this.selectedObject) {
+      console.warn("No selected object to synchronize");
+      return;
+    }
 
     const obj = this.selectedObject;
+    console.log("Selected object:", obj.type);
 
+    // Reset filters object to default values
+    this.resetFilterValues();
+
+    // Get current object properties
     this.objectProperties = {
-      opacity: obj.opacity || 1,
+      opacity: obj.opacity !== undefined ? obj.opacity : 1,
       stroke: obj.stroke || "#000000",
-      strokeWidth: obj.strokeWidth || 0,
-      radius: obj.clipPath ? obj.clipPath.rx : 0,
+      strokeWidth: obj.strokeWidth !== undefined ? obj.strokeWidth : 0,
+      radius: obj.clipPath ? obj.clipPath.rx || 0 : 0,
       skewX: obj.skewX || 0,
       skewY: obj.skewY || 0,
       fill: obj.fill || "#000000",
@@ -1501,12 +1746,11 @@ Alpine.data("uploadsPanel", () => ({
       shadowOffsetY: obj.shadow ? obj.shadow.offsetY : 0,
     };
 
-    // Reset filters
-    this.resetFilterValues();
+    console.log("Object properties synchronized:", this.objectProperties);
   },
-
   // Reset filter values
   resetFilterValues() {
+    console.log("Resetting filter values");
     this.filters = {
       brightness: 0,
       contrast: 0,
@@ -1517,171 +1761,430 @@ Alpine.data("uploadsPanel", () => ({
       pixelate: 0,
     };
     this.activeFilter = null;
+    console.log("Filter values reset");
   },
-
-  // Apply a specific filter to the active object
-  applyFilter(type, value) {
-    if (
-      !this.selectedObject ||
-      !window.canvas ||
-      this.selectedObject.type !== "image"
-    )
-      return;
-
-    const obj = this.selectedObject;
-    let filter;
-
-    // Create filter based on type
-    switch (type) {
-      case "brightness":
-        filter = new fabric.Image.filters.Brightness({
-          brightness: parseFloat(value),
-        });
-        break;
-      case "contrast":
-        filter = new fabric.Image.filters.Contrast({
-          contrast: parseFloat(value),
-        });
-        break;
-      case "blur":
-        filter = new fabric.Image.filters.Blur({
-          blur: parseFloat(value),
-        });
-        break;
-      case "noise":
-        filter = new fabric.Image.filters.Noise({
-          noise: parseInt(value, 10),
-        });
-        break;
-      case "saturation":
-        filter = new fabric.Image.filters.Saturation({
-          saturation: parseFloat(value),
-        });
-        break;
-      case "hue":
-        filter = new fabric.Image.filters.HueRotation({
-          rotation: parseFloat(value),
-        });
-        break;
-      case "pixelate":
-        filter = new fabric.Image.filters.Pixelate({
-          blocksize: parseInt(value, 10),
-        });
-        break;
-    }
-
-    if (!filter) return;
-
-    // Initialize filters array if it doesn't exist
-    if (!obj.filters) obj.filters = [];
-
-    // Find if filter of this type already exists
-    const filterIndex = obj.filters.findIndex((f) => f.type === filter.type);
-
-    // Add or update filter
-    if (filterIndex > -1) {
-      obj.filters[filterIndex] = filter;
-    } else {
-      obj.filters.push(filter);
-    }
-
-    // Apply filters
-    obj.applyFilters();
-    window.canvas.renderAll();
-  },
-
   // Apply a preset filter
   applyPresetFilter(filterName) {
-    if (
-      !this.selectedObject ||
-      !window.canvas ||
-      this.selectedObject.type !== "image"
-    )
-      return;
+    console.log(`Applying preset filter: ${filterName}`);
 
-    // Set active filter
+    // Check if filters are available
+    if (!this.filterAvailable) {
+      console.warn("Filters are not available in this Fabric.js instance");
+      return;
+    }
+
+    if (!this.selectedObject) {
+      console.warn("No selected object for preset filter");
+      return;
+    }
+
+    if (!window.canvas) {
+      console.error("Canvas not available for preset filter");
+      return;
+    }
+
+    if (this.selectedObject.type !== "image") {
+      console.warn("Selected object is not an image");
+      return;
+    }
+
+    // Use the custom filter implementation
+    this.applyCustomFilter(filterName);
+  },
+  // Custom Filter View implementation
+  applyCustomFilter(filterName) {
+    console.log(`Applying custom filter: ${filterName}`);
+
+    if (!this.selectedObject || !window.canvas) {
+      console.warn("No selected object or canvas available");
+      return;
+    }
+
+    if (this.selectedObject.type !== "image") {
+      console.warn("Selected object is not an image");
+      return;
+    }
+
+    // Set active filter name
     this.activeFilter = filterName;
 
-    const obj = this.selectedObject;
+    // Store the original image when first applying a filter
+    if (!this.originalImage) {
+      this.originalImage =
+        this.selectedObject._originalElement || this.selectedObject._element;
+      console.log("Original image stored for reference");
+    }
 
-    // Clear existing filters
-    obj.filters = [];
+    // Create a temporary canvas to apply filters
+    const tempCanvas = document.createElement("canvas");
 
-    // Apply the selected filter
+    // Use original image to avoid quality loss
+    const imgElement = this.originalImage;
+
+    // Set canvas size to match image
+    tempCanvas.width = imgElement.width;
+    tempCanvas.height = imgElement.height;
+    const ctx = tempCanvas.getContext("2d");
+
+    // Draw original image
+    ctx.drawImage(imgElement, 0, 0);
+
+    // Get image data for manipulation
+    const imageData = ctx.getImageData(
+      0,
+      0,
+      tempCanvas.width,
+      tempCanvas.height
+    );
+    const data = imageData.data;
+
+    // Apply filter effects based on filter name
     switch (filterName) {
-      case "black_white":
-        obj.filters.push(new fabric.Image.filters.BlackWhite());
-        break;
-      case "brownie":
-        obj.filters.push(new fabric.Image.filters.Brownie());
-        break;
       case "grayscale":
-        obj.filters.push(new fabric.Image.filters.Grayscale());
+      case "black_white":
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          data[i] = avg;
+          data[i + 1] = avg;
+          data[i + 2] = avg;
+        }
         break;
-      case "invert":
-        obj.filters.push(new fabric.Image.filters.Invert());
-        break;
+
       case "sepia":
-        obj.filters.push(new fabric.Image.filters.Sepia());
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          data[i] = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+          data[i + 1] = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+          data[i + 2] = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+        }
         break;
+
+      case "invert":
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = 255 - data[i];
+          data[i + 1] = 255 - data[i + 1];
+          data[i + 2] = 255 - data[i + 2];
+        }
+        break;
+
+      case "brownie":
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          data[i] = r * 0.59 + g * 0.34 + b * 0.07;
+          data[i + 1] = r * 0.31 + g * 0.54 + b * 0.15;
+          data[i + 2] = r * 0.19 + g * 0.28 + b * 0.47;
+        }
+        break;
+
       case "kodachrome":
-        obj.filters.push(new fabric.Image.filters.Kodachrome());
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // Boost colors with cross-processing effect
+          data[i] = Math.min(255, r * 1.2 + g * 0.1 + b * 0.1);
+          data[i + 1] = Math.min(255, r * 0.1 + g * 1.1 + b * 0.1);
+          data[i + 2] = Math.min(255, r * 0.1 + g * 0.1 + b * 1.3);
+        }
         break;
+
       case "technicolor":
-        obj.filters.push(new fabric.Image.filters.Technicolor());
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          data[i] = Math.min(255, r * 1.3 - g * 0.1 - b * 0.1);
+          data[i + 1] = Math.min(255, g * 1.2 - r * 0.1 - b * 0.1);
+          data[i + 2] = Math.min(255, b * 1.2 - r * 0.1 - g * 0.1);
+        }
         break;
-      case "polaroid":
-        obj.filters.push(new fabric.Image.filters.Polaroid());
-        break;
-      case "vintage":
-        obj.filters.push(new fabric.Image.filters.Vintage());
-        break;
+
       case "sharpen":
-        obj.filters.push(
-          new fabric.Image.filters.Convolute({
-            matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0],
-          })
-        );
+        // Sharpen using a convolution kernel
+        {
+          const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+          const side = Math.round(Math.sqrt(kernel.length));
+          const halfSide = Math.floor(side / 2);
+          const w = imageData.width;
+          const h = imageData.height;
+
+          // Create temp array for the convolution result
+          const temp = new Uint8ClampedArray(data.length);
+
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              let r = 0,
+                g = 0,
+                b = 0;
+
+              // Apply convolution kernel
+              for (let ky = 0; ky < side; ky++) {
+                for (let kx = 0; kx < side; kx++) {
+                  const pixelX = Math.min(
+                    w - 1,
+                    Math.max(0, x + kx - halfSide)
+                  );
+                  const pixelY = Math.min(
+                    h - 1,
+                    Math.max(0, y + ky - halfSide)
+                  );
+                  const offset = (pixelY * w + pixelX) * 4;
+                  const weight = kernel[ky * side + kx];
+
+                  r += data[offset] * weight;
+                  g += data[offset + 1] * weight;
+                  b += data[offset + 2] * weight;
+                }
+              }
+
+              // Write result to temp array
+              const dstOffset = (y * w + x) * 4;
+              temp[dstOffset] = Math.min(255, Math.max(0, r));
+              temp[dstOffset + 1] = Math.min(255, Math.max(0, g));
+              temp[dstOffset + 2] = Math.min(255, Math.max(0, b));
+              temp[dstOffset + 3] = data[dstOffset + 3]; // Keep original alpha
+            }
+          }
+
+          // Copy temp array back to data
+          for (let i = 0; i < data.length; i++) {
+            data[i] = temp[i];
+          }
+        }
         break;
+
       case "emboss":
-        obj.filters.push(
-          new fabric.Image.filters.Convolute({
-            matrix: [1, 1, 1, 1, 0.7, -1, -1, -1, -1],
-          })
-        );
+        // Emboss effect using convolution
+        {
+          const kernel = [1, 1, 1, 1, 0.7, -1, -1, -1, -1];
+          const side = Math.round(Math.sqrt(kernel.length));
+          const halfSide = Math.floor(side / 2);
+          const w = imageData.width;
+          const h = imageData.height;
+
+          // Create temp array for the convolution result
+          const temp = new Uint8ClampedArray(data.length);
+
+          for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+              let r = 0,
+                g = 0,
+                b = 0;
+
+              // Apply convolution kernel
+              for (let ky = 0; ky < side; ky++) {
+                for (let kx = 0; kx < side; kx++) {
+                  const pixelX = Math.min(
+                    w - 1,
+                    Math.max(0, x + kx - halfSide)
+                  );
+                  const pixelY = Math.min(
+                    h - 1,
+                    Math.max(0, y + ky - halfSide)
+                  );
+                  const offset = (pixelY * w + pixelX) * 4;
+                  const weight = kernel[ky * side + kx];
+
+                  r += data[offset] * weight;
+                  g += data[offset + 1] * weight;
+                  b += data[offset + 2] * weight;
+                }
+              }
+
+              // Write result to temp array
+              const dstOffset = (y * w + x) * 4;
+              temp[dstOffset] = Math.min(255, Math.max(0, r));
+              temp[dstOffset + 1] = Math.min(255, Math.max(0, g));
+              temp[dstOffset + 2] = Math.min(255, Math.max(0, b));
+              temp[dstOffset + 3] = data[dstOffset + 3]; // Keep original alpha
+            }
+          }
+
+          // Copy temp array back to data
+          for (let i = 0; i < data.length; i++) {
+            data[i] = temp[i];
+          }
+        }
+        break;
+
+      case "polaroid":
+        // Warm colors + vignette effect
+        for (let i = 0; i < data.length; i += 4) {
+          // First, warm the colors (increase red, decrease blue)
+          data[i] = Math.min(255, data[i] * 1.1); // More red
+          data[i + 2] = Math.min(255, data[i + 2] * 0.9); // Less blue
+
+          // Add slight contrast
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          data[i] += (data[i] - avg) * 0.1;
+          data[i + 1] += (data[i + 1] - avg) * 0.1;
+          data[i + 2] += (data[i + 2] - avg) * 0.1;
+
+          // Ensure values are in valid range
+          data[i] = Math.min(255, Math.max(0, data[i]));
+          data[i + 1] = Math.min(255, Math.max(0, data[i + 1]));
+          data[i + 2] = Math.min(255, Math.max(0, data[i + 2]));
+        }
+        break;
+
+      case "vintage":
+        // Vintage effect (sepia + desaturation + slight contrast adjustment)
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+
+          // First apply sepia
+          let newR = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+          let newG = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+          let newB = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+
+          // Then reduce contrast slightly
+          const grey = 0.2989 * newR + 0.587 * newG + 0.114 * newB; // Luminance
+          const factor = 0.15; // Contrast reduction factor
+
+          newR = grey + (1 - factor) * (newR - grey);
+          newG = grey + (1 - factor) * (newG - grey);
+          newB = grey + (1 - factor) * (newB - grey);
+
+          data[i] = Math.min(255, Math.max(0, newR));
+          data[i + 1] = Math.min(255, Math.max(0, newG));
+          data[i + 2] = Math.min(255, Math.max(0, newB));
+        }
         break;
     }
 
-    // Apply the filters
-    obj.applyFilters();
-    window.canvas.renderAll();
-  },
+    // Put modified pixels back
+    ctx.putImageData(imageData, 0, 0);
 
+    // Create new image from filtered canvas
+    const newImg = new Image();
+    newImg.onload = () => {
+      // Replace the image element in the Fabric.js object
+      this.selectedObject._element = newImg;
+
+      // Force a re-render
+      this.selectedObject.dirty = true;
+      window.canvas.renderAll();
+      console.log("Custom filter applied successfully");
+    };
+    newImg.src = tempCanvas.toDataURL();
+  },
+  applyFilter(type, value) {
+    // Update internal tracking
+    this.filters[type] = parseFloat(value);
+
+    // Only handle brightness for now
+    if (type === "brightness" && this.selectedObject) {
+      const brightnessValue = parseFloat(value);
+
+      // Reset previous filters
+      this.selectedObject.filters = [];
+
+      // Safely apply brightness filter
+      if (brightnessValue !== 0) {
+        // Create a clone of the original image to prevent data loss
+        if (!this.selectedObject.originalImage) {
+          const originalSrc = this.selectedObject.getSrc();
+          const originalWidth = this.selectedObject.width;
+          const originalHeight = this.selectedObject.height;
+
+          // Store original image details
+          this.selectedObject.originalImage = {
+            src: originalSrc,
+            width: originalWidth,
+            height: originalHeight,
+          };
+        }
+
+        // Adjust brightness safely
+        const brightnessFilter = new fabric.Image.filters.Brightness({
+          brightness: Math.max(0.1, 1 + brightnessValue),
+        });
+
+        this.selectedObject.filters.push(brightnessFilter);
+      }
+
+      // Apply filters
+      this.selectedObject.applyFilters();
+
+      // Render canvas
+      window.canvas.renderAll();
+    }
+  },
   // Reset all filters
   resetFilters() {
-    if (
-      !this.selectedObject ||
-      !window.canvas ||
-      this.selectedObject.type !== "image"
-    )
-      return;
-
-    this.activeFilter = null;
-    this.resetFilterValues();
-
-    this.selectedObject.filters = [];
-    this.selectedObject.applyFilters();
-    window.canvas.renderAll();
-  },
-
-  updateObjectProperty(property, value) {
-    // Ensure we have a selected object and canvas
-    if (!this.selectedObject || !window.canvas) {
-      console.error("No selected object or canvas available");
+    if (!this.selectedObject || !this.originalImage) {
       return;
     }
 
-    console.log(`Updating ${property} to ${value}`); // Debug to confirm triggering
+    try {
+      // Reset our tracking filters object
+      this.resetFilterValues();
+
+      // Create a new image with the original source
+      const newImg = new Image();
+
+      newImg.onload = () => {
+        // Get properties of current object
+        const props = {
+          scaleX: this.selectedObject.scaleX,
+          scaleY: this.selectedObject.scaleY,
+          left: this.selectedObject.left,
+          top: this.selectedObject.top,
+          angle: this.selectedObject.angle || 0,
+          flipX: this.selectedObject.flipX || false,
+          flipY: this.selectedObject.flipY || false,
+          originX: this.selectedObject.originX || "center",
+          originY: this.selectedObject.originY || "center",
+        };
+
+        // Create a new fabric image
+        const fabricImg = new fabric.Image(newImg, props);
+
+        // Replace current object
+        const objIndex = window.canvas
+          .getObjects()
+          .indexOf(this.selectedObject);
+        if (objIndex !== -1) {
+          window.canvas.remove(this.selectedObject);
+          window.canvas.insertAt(fabricImg, objIndex);
+          window.canvas.setActiveObject(fabricImg);
+          this.selectedObject = fabricImg;
+        } else {
+          window.canvas.add(fabricImg);
+          window.canvas.setActiveObject(fabricImg);
+          this.selectedObject = fabricImg;
+        }
+
+        window.canvas.renderAll();
+      };
+
+      newImg.src = this.originalImage.src;
+    } catch (error) {
+      console.error("Error resetting filters:", error);
+    }
+  },
+  // Update object property
+  updateObjectProperty(property, value) {
+    console.log(`Updating object property: ${property} to ${value}`);
+
+    // Ensure we have a selected object and canvas
+    if (!this.selectedObject) {
+      console.error("No selected object available");
+      return;
+    }
+
+    if (!window.canvas) {
+      console.error("Canvas not available");
+      return;
+    }
 
     // Convert value based on property type
     let finalValue;
@@ -1707,10 +2210,25 @@ Alpine.data("uploadsPanel", () => ({
     }
 
     // Apply the property to the selected object
-    this.selectedObject.set(property, finalValue);
+    console.log(`Setting ${property} = ${finalValue} on object`);
+    try {
+      // Set the property on the object
+      this.selectedObject.set(property, finalValue);
+
+      // Special case for stroke: need to make sure strokeWidth is non-zero
+      if (property === "stroke" && this.selectedObject.strokeWidth === 0) {
+        console.log("Stroke color set but width is 0. Setting default width.");
+        this.selectedObject.set("strokeWidth", 1);
+        this.objectProperties.strokeWidth = 1;
+      }
+    } catch (e) {
+      console.error(`Error setting property ${property}:`, e);
+      return;
+    }
 
     // Update local state (objectProperties)
     if (property in this.objectProperties) {
+      console.log(`Updating objectProperties.${property}`);
       this.objectProperties[property] = finalValue;
     } else {
       console.warn(`Property ${property} not in objectProperties`);
@@ -1718,90 +2236,21 @@ Alpine.data("uploadsPanel", () => ({
 
     // Special handling for radius (if called directly, though typically via updateClipPath)
     if (property === "radius") {
+      console.log("Calling updateClipPath for radius property");
       this.updateClipPath(finalValue);
     }
 
     // Re-render the canvas
-    window.canvas.renderAll();
-  },
-
-  updateClipPath(value) {
-    if (!this.selectedObject || !window.canvas) return;
-
-    const radius = parseInt(value, 10);
-    if (isNaN(radius)) {
-      console.warn(`Invalid radius value: ${value}`);
-      return;
+    console.log("Rendering canvas after property update");
+    try {
+      window.canvas.renderAll();
+      console.log("Canvas rendered successfully");
+    } catch (e) {
+      console.error("Error rendering canvas:", e);
     }
-
-    this.objectProperties.radius = radius;
-
-    if (radius === 0) {
-      this.selectedObject.clipPath = null;
-    } else {
-      const width = this.selectedObject.width * this.selectedObject.scaleX;
-      const height = this.selectedObject.height * this.selectedObject.scaleY;
-
-      this.selectedObject.clipPath = new fabric.Rect({
-        width: width,
-        height: height,
-        rx: radius,
-        ry: radius,
-        originX: "center",
-        originY: "center",
-      });
-    }
-
-    window.canvas.renderAll();
-  },
-
-  // Toggle shadow
-  toggleShadow() {
-    if (!this.selectedObject || !window.canvas) return;
-
-    if (this.objectProperties.shadowEnabled) {
-      // Enable shadow
-      this.selectedObject.shadow = new fabric.Shadow({
-        color: this.objectProperties.shadowColor,
-        blur: this.objectProperties.shadowBlur,
-        offsetX: this.objectProperties.shadowOffsetX,
-        offsetY: this.objectProperties.shadowOffsetY,
-      });
-    } else {
-      // Disable shadow
-      this.selectedObject.shadow = null;
-    }
-
-    window.canvas.renderAll();
-  },
-
-  // Update shadow properties
-  updateShadow(property, value) {
-    if (
-      !this.selectedObject ||
-      !window.canvas ||
-      !this.objectProperties.shadowEnabled
-    )
-      return;
-
-    // Update local state
-    const propName = `shadow${
-      property.charAt(0).toUpperCase() + property.slice(1)
-    }`;
-    this.objectProperties[propName] =
-      property === "color" ? value : parseFloat(value);
-
-    // Create a new shadow with updated properties
-    this.selectedObject.shadow = new fabric.Shadow({
-      color: this.objectProperties.shadowColor,
-      blur: this.objectProperties.shadowBlur,
-      offsetX: this.objectProperties.shadowOffsetX,
-      offsetY: this.objectProperties.shadowOffsetY,
-    });
-
-    window.canvas.renderAll();
   },
 }));
+
 // Drawing Panel Component
 Alpine.data("drawingPanel", () => ({
   isActive: false,
@@ -2235,7 +2684,7 @@ Alpine.data("drawingPanel", () => ({
     }
   },
 }));
-// Layers Panel Component - Corrected Version
+
 // Layers Panel Component - Compatible Version
 Alpine.data("layersPanel", () => ({
   isActive: false,
@@ -2541,6 +2990,7 @@ Alpine.data("clipArtsPanel", () => ({
     });
   },
 }));
+
 // Mask Panel Component
 Alpine.data("maskPanel", () => ({
   isActive: false,
@@ -2590,6 +3040,7 @@ Alpine.data("maskPanel", () => ({
     });
   },
 }));
+
 // Quick Options Bar Component
 Alpine.data("quickOptionsBar", () => ({
   hasSelection: false,
@@ -2775,6 +3226,7 @@ Alpine.data("quickOptionsBar", () => ({
     window.canvas.renderAll();
   },
 }));
+
 // Export Functions Component
 Alpine.data("exportFunctions", () => ({
   exportInProgress: false,
@@ -2860,6 +3312,7 @@ Alpine.data("exportFunctions", () => ({
     this.exportInProgress = false;
   },
 }));
+
 // Canvas Utilities
 Alpine.data("canvasUtilities", () => ({
   // Center all objects on canvas
@@ -2939,6 +3392,144 @@ Alpine.data("canvasUtilities", () => ({
         window.canvas.renderAll();
       });
     }
+  },
+}));
+
+// Settings Panel Component
+Alpine.data("settingsPanel", () => ({
+  isActive: false,
+  customSizeVisible: false,
+  backgroundColor: "#ffffff",
+  customWidth: 1080,
+  customHeight: 1920,
+  open: false,
+
+  // Predefined canvas sizes
+  canvasSizes: [
+    { name: "TikTok (1080x1920)", value: "1080x1920", key: "tiktok" },
+    { name: "YouTube (1280x720)", value: "1280x720", key: "youtube" },
+    { name: "Facebook Post (1200x630)", value: "1200x630", key: "fb-post" },
+    { name: "Instagram Post (1080x1080)", value: "1080x1080", key: "ig-post" },
+    {
+      name: "Instagram Story (1080x1920)",
+      value: "1080x1920",
+      key: "ig-story",
+    },
+    { name: "Facebook Cover (820x312)", value: "820x312", key: "fb-cover" },
+    { name: "LinkedIn Post (1200x1200)", value: "1200x1200", key: "li-post" },
+    { name: "LinkedIn Cover (1584x396)", value: "1584x396", key: "li-cover" },
+    { name: "Twitter Header (1500x500)", value: "1500x500", key: "twitter" },
+    { name: "Snapchat Story (1080x1920)", value: "1080x1920", key: "snapchat" },
+    {
+      name: "YouTube Channel Art (2560x1440)",
+      value: "2560x1440",
+      key: "yt-art",
+    },
+    { name: "Pinterest Pin (1600x900)", value: "1600x900", key: "pinterest" },
+    { name: "Custom", value: "custom", key: "custom" },
+  ],
+  filteredSizes: [],
+  search: "",
+  selectedSize: "TikTok (1080x1920)",
+  selectedValue: "1080x1920",
+
+  init() {
+    // Initialize filteredSizes with all sizes
+    this.filteredSizes = [...this.canvasSizes];
+
+    // Listen for tool changes
+    window.addEventListener("tool-changed", (e) => {
+      this.isActive = e.detail.type === "settings";
+
+      // Initialize with current canvas settings if available
+      if (this.isActive && window.canvas) {
+        this.backgroundColor = window.canvas.backgroundColor || "#ffffff";
+      }
+    });
+  },
+
+  // Filter sizes based on search
+  filterSizes() {
+    if (!this.search) {
+      this.filteredSizes = this.canvasSizes;
+      return;
+    }
+
+    this.filteredSizes = this.canvasSizes.filter((size) =>
+      size.name.toLowerCase().includes(this.search.toLowerCase())
+    );
+  },
+
+  // Select a size from the dropdown
+  selectSize(size) {
+    this.selectedSize = size.name;
+    this.selectedValue = size.value;
+
+    if (size.value === "custom") {
+      this.customSizeVisible = true;
+      return;
+    }
+
+    this.customSizeVisible = false;
+
+    // Parse dimensions from the value (format: "WidthxHeight")
+    const [width, height] = size.value.split("x").map(Number);
+
+    // Apply size to canvas
+    this.resizeCanvas(width, height);
+  },
+
+  // Apply custom size
+  applyCustomSize() {
+    if (!this.customWidth || !this.customHeight) return;
+
+    this.resizeCanvas(this.customWidth, this.customHeight);
+  },
+
+  // Resize the canvas to specified dimensions
+  resizeCanvas(width, height) {
+    if (!window.canvas) return;
+
+    // Get current objects and canvas state
+    const objects = window.canvas.getObjects();
+    const currentWidth = window.canvas.width;
+    const currentHeight = window.canvas.height;
+
+    // Set new canvas dimensions
+    window.canvas.setWidth(width);
+    window.canvas.setHeight(height);
+
+    // Adjust objects if needed (scale or reposition)
+    if (objects.length > 0) {
+      // Simple approach: center all content
+      const selection = new fabric.ActiveSelection(objects, {
+        canvas: window.canvas,
+      });
+
+      // Center the selection properly
+      selection.centerH();
+      selection.centerV();
+
+      window.canvas.discardActiveObject();
+    }
+
+    // Trigger a canvas resize event
+    window.dispatchEvent(
+      new CustomEvent("canvas:resized", {
+        detail: { width, height },
+      })
+    );
+
+    window.canvas.renderAll();
+  },
+
+  // Update background color
+  updateBackgroundColor() {
+    if (!window.canvas) return;
+
+    // Use the standard Fabric.js way to set background color
+    window.canvas.backgroundColor = this.backgroundColor;
+    window.canvas.renderAll();
   },
 }));
 
