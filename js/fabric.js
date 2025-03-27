@@ -1,5 +1,8 @@
 import * as fabric from 'fabric';
+<<<<<<< HEAD
 
+=======
+>>>>>>> main
 
 export default (() => {
     return {
@@ -14,6 +17,27 @@ export default (() => {
             // Make canvas available globally for other components
             window.canvas = canvas;
 
+<<<<<<< HEAD
+=======
+            // Add demo elements
+            const helloWorld = new fabric.Text('Checking Fabric Js', {
+                fontFamily: 'Roboto',
+                fontSize: 30
+            });
+
+            const rect = new fabric.Rect({
+                fill: '#ff0000',
+                left: 400,
+                top: 200,
+                width: 250,
+                height: 250,
+            });
+
+            canvas.add(rect);
+            canvas.add(helloWorld);
+            canvas.centerObject(helloWorld);
+
+>>>>>>> main
             // Set up event listeners to communicate with other components
             canvas.on('selection:created', this.handleSelection);
             canvas.on('selection:updated', this.handleSelection);
