@@ -1,6 +1,41 @@
-import { Canvas, Textbox, IText, Shadow, Text, Group } from "fabric";
+// src/fabric.js - Consolidated Fabric.js integration
+import * as fabric from "fabric";
 
-import updateTextCurve from "./curveTextBridge";
+// Import utility functions
+import {
+  centerAll,
+  fitToCanvas,
+  clearCanvas,
+  align,
+  group,
+  ungroup,
+  bringToFront,
+  bringForward,
+  sendBackward,
+  sendToBack,
+  deleteObject,
+  cloneObject,
+  toggleLock,
+} from "./utils/canvas-utils.js";
+
+import {
+  downloadCanvas,
+  downloadPNG,
+  downloadJPG,
+} from "./utils/export-utils.js";
+
+import {
+  initHistoryManager,
+  addToHistory,
+  undo,
+  redo,
+} from "./utils/history-manager.js";
+
+// Make Fabric available globally
+window.fabric = fabric;
+
+// Import filters
+import "./filters/fabric-filters-polyfill.js";
 
 export default function () {
   let canvas;
@@ -11,39 +46,111 @@ export default function () {
     hasSelection: false,
     canCrop: false,
     cropActive: false,
+    activeTool: "select",
 
-    // Initialize the canvas
     init() {
-      // Initialize the canvas with explicit dimensions
-      canvas = new Canvas(this.$refs.canvas, {
-        width: 800,
-        height: 600,
+      // Initialize the canvas when the DOM is ready
+      this.$nextTick(() => {
+        this.initCanvas();
+
+        // Make necessary utilities available globally
+        window.downloadCanvas = downloadCanvas;
+        window.canvasUtils = {
+          centerAll,
+          fitToCanvas,
+          clearCanvas,
+          align,
+          group,
+          ungroup,
+          bringForward,
+          sendBackward,
+          bringToFront,
+          sendToBack,
+          deleteObject,
+          cloneObject,
+          toggleLock,
+        };
+
+        // Initialize history manager
+        initHistoryManager();
+      });
+    },
+
+    // Initialize the main canvas
+    initCanvas() {
+      // Create canvas instance
+      canvas = new fabric.Canvas(this.$refs.canvas || "image-editor", {
         preserveObjectStacking: true,
+        width: 1200,
+        height: 600,
         backgroundColor: "#ffffff",
         selection: true,
       });
 
-      // Force the HTML canvas element to match these dimensions
-      this.$refs.canvas.style.width = "800px";
-      this.$refs.canvas.style.height = "600px";
-      this.$refs.canvas.style.position = "relative";
+      // Make it globally available
+      window.canvas = canvas;
 
       // Set up event listeners
       canvas.on("selection:created", this.handleObjectSelected);
       canvas.on("selection:updated", this.handleObjectSelected);
       canvas.on("selection:cleared", this.handleSelectionCleared);
+      canvas.on("object:modified", this.handleObjectModified);
+      canvas.on("object:added", this.handleObjectAdded);
+      canvas.on("object:removed", this.handleObjectRemoved);
 
-      console.log("Canvas initialized with dimensions 800x600");
+      // Add some demo objects if needed
+      const welcomeText = new fabric.Text("Welcome to Steve Editor", {
+        fontFamily: "Roboto",
+        fontSize: 30,
+        fill: "#333333",
+        left: 400,
+        top: 100,
+      });
+
+      const rectangle = new fabric.Rect({
+        width: 200,
+        height: 150,
+        fill: "#ff5555",
+        left: 300,
+        top: 300,
+        rx: 10,
+        ry: 10,
+      });
+
+      canvas.add(welcomeText);
+      canvas.add(rectangle);
+      canvas.centerObject(welcomeText);
+
+      // Notify other components that canvas is ready
+      window.dispatchEvent(
+        new CustomEvent("canvas:initialized", {
+          detail: { canvas: canvas },
+        })
+      );
+
+      console.log("Canvas initialized");
       canvas.requestRenderAll();
     },
 
-    // Selection handling
+    // Handle selection events
     handleObjectSelected(e) {
       this.hasSelection = true;
-      const obj = e.selected[0];
+      const obj = e.selected ? e.selected[0] : canvas.getActiveObject();
+
+      if (!obj) return;
       console.log("Object selected:", obj.type);
 
-      if (obj && (obj.type === "textbox" || obj.type === "i-text")) {
+      // Dispatch event to notify panels about selection
+      window.dispatchEvent(
+        new CustomEvent("object:selected", {
+          detail: obj,
+        })
+      );
+
+      if (
+        obj &&
+        (obj.type === "textbox" || obj.type === "i-text" || obj.type === "text")
+      ) {
         selectedTextObject = obj;
         this.canCrop = false;
 
@@ -94,6 +201,48 @@ export default function () {
           detail: { type: "none" },
         })
       );
+
+      // Notify other components that selection is cleared
+      window.dispatchEvent(new CustomEvent("selection:cleared"));
+    },
+
+    // Handle object modified events
+    handleObjectModified(e) {
+      // Add to history stack for undo
+      addToHistory();
+
+      // Notify panels about modification
+      window.dispatchEvent(
+        new CustomEvent("object:modified", {
+          detail: e.target,
+        })
+      );
+    },
+
+    // Handle object added events
+    handleObjectAdded(e) {
+      // Add to history stack for undo
+      addToHistory();
+
+      // Notify panels about new object
+      window.dispatchEvent(
+        new CustomEvent("object:added", {
+          detail: e.target,
+        })
+      );
+    },
+
+    // Handle object removed events
+    handleObjectRemoved(e) {
+      // Add to history stack for undo
+      addToHistory();
+
+      // Notify panels about removed object
+      window.dispatchEvent(
+        new CustomEvent("object:removed", {
+          detail: e.target,
+        })
+      );
     },
 
     // Text Methods
@@ -110,7 +259,7 @@ export default function () {
       // Use Textbox instead of CurvedText
       switch (type) {
         case "full":
-          textObj = new Textbox("New Heading", {
+          textObj = new fabric.Textbox("New Heading", {
             left: 100,
             top: 100,
             width: 300,
@@ -120,7 +269,7 @@ export default function () {
           });
           break;
         case "sub":
-          textObj = new Textbox("New Subheading", {
+          textObj = new fabric.Textbox("New Subheading", {
             left: 100,
             top: 150,
             width: 250,
@@ -130,7 +279,7 @@ export default function () {
           });
           break;
         case "paragraph":
-          textObj = new Textbox("Add your text here", {
+          textObj = new fabric.Textbox("Add your text here", {
             left: 100,
             top: 200,
             width: 400,
@@ -140,7 +289,7 @@ export default function () {
           });
           break;
         default:
-          textObj = new Textbox("New Text", {
+          textObj = new fabric.Textbox("New Text", {
             left: 100,
             top: 100,
             width: 200,
@@ -279,7 +428,7 @@ export default function () {
       if (enabled) {
         selectedTextObject.set(
           "shadow",
-          new Shadow({
+          new fabric.Shadow({
             color: "#000000",
             blur: 5,
             offsetX: 5,
@@ -305,7 +454,7 @@ export default function () {
       if (!selectedTextObject.shadow) {
         selectedTextObject.set(
           "shadow",
-          new Shadow({
+          new fabric.Shadow({
             color: "#000000",
             blur: 5,
             offsetX: 5,
@@ -324,6 +473,7 @@ export default function () {
 
       canvas.requestRenderAll();
     },
+
     updateTextCurve(value) {
       console.log("Update text curve:", value);
 
@@ -374,7 +524,7 @@ export default function () {
         canvas.remove(groupObject);
 
         // Create a new regular text object
-        const textObj = new Textbox(text, {
+        const textObj = new fabric.Textbox(text, {
           left: originalProps.left,
           top: originalProps.top,
           width: text.length * originalProps.fontSize * 0.6,
@@ -433,6 +583,81 @@ export default function () {
       }
 
       canvas.requestRenderAll();
+    },
+
+    // Canvas utilities methods
+    centerAll() {
+      centerAll(canvas);
+    },
+
+    fitToCanvas() {
+      fitToCanvas(canvas);
+    },
+
+    clearCanvas() {
+      clearCanvas(canvas);
+    },
+
+    alignObjects(direction) {
+      align(canvas, direction);
+    },
+
+    groupObjects() {
+      group(canvas);
+    },
+
+    ungroupObjects() {
+      ungroup(canvas);
+    },
+
+    bringForward() {
+      bringForward(canvas);
+    },
+
+    sendBackward() {
+      sendBackward(canvas);
+    },
+
+    bringToFront() {
+      bringToFront(canvas);
+    },
+
+    sendToBack() {
+      sendToBack(canvas);
+    },
+
+    deleteSelectedObject() {
+      deleteObject(canvas);
+    },
+
+    cloneSelectedObject() {
+      cloneObject(canvas);
+    },
+
+    toggleObjectLock() {
+      toggleLock(canvas);
+    },
+
+    // Export methods
+    downloadAsCanvas() {
+      downloadCanvas(canvas);
+    },
+
+    downloadAsPNG() {
+      downloadPNG(canvas);
+    },
+
+    downloadAsJPG() {
+      downloadJPG(canvas);
+    },
+
+    // History methods
+    undo() {
+      undo(canvas);
+    },
+
+    redo() {
+      redo(canvas);
     },
   };
 }
