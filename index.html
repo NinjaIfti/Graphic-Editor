@@ -151,53 +151,52 @@
       </ul>
     </div>
     <!-- Navbar -->
-    <div class="bg-white shadow-md px-4 py-3 flex items-center justify-between">
+    <div
+      class="bg-gray-50 shadow-lg border-b border-gray-200 px-4 py-1 mb-5 flex items-center justify-between"
+    >
       <div class="flex items-center justify-between w-full">
         <!-- Logo Section -->
-        <h4 class="text-lg font-semibold text-gray-800">Steve Editor</h4>
+        <h4 class="text-xl font-bold text-gray-800">Steve Editor</h4>
 
         <div
-          class="bg-white shadow-md px-4 py-3 flex items-center justify-between"
+          class="flex items-center justify-end mt-2"
           x-data="exportFunctions"
         >
-          <div class="flex items-center justify-between w-full">
-            <!-- Logo Section -->
-            <div class="flex gap-3">
-              <!-- Export Buttons -->
-              <button
-                @click="downloadCanvas('png')"
-                class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+          <div class="flex items-center space-x-4 mb-2">
+            <!-- Export Buttons -->
+            <button
+              @click="downloadCanvas('png')"
+              class="flex items-center gap-2 px-4 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors duration-200 shadow-sm cursor-pointer"
+            >
+              <svg
+                class="w-4 h-4"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 -960 960 960"
               >
-                <svg
-                  class="w-4 h-4 text-gray-700"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 -960 960 960"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
-                  />
-                </svg>
-                <span class="text-gray-800">PNG</span>
-              </button>
+                <path
+                  fill="currentColor"
+                  d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
+                />
+              </svg>
+              <span class="font-medium text-sm">PNG</span>
+            </button>
 
-              <button
-                @click="downloadCanvas('jpg')"
-                class="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+            <button
+              @click="downloadCanvas('jpg')"
+              class="flex items-center gap-2 px-4 py-1.5 bg-white border border-gray-300 text-gray-800 rounded hover:bg-gray-100 transition-colors duration-200 shadow-sm cursor-pointer"
+            >
+              <svg
+                class="w-4 h-4 text-gray-700"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 -960 960 960"
               >
-                <svg
-                  class="w-4 h-4 text-gray-700"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 -960 960 960"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
-                  />
-                </svg>
-                <span class="text-gray-800">JPG</span>
-              </button>
-            </div>
+                <path
+                  fill="currentColor"
+                  d="M444-192v-438L243-429l-51-51 288-288 288 288-51 51-201-201v438h-72Z"
+                />
+              </svg>
+              <span class="font-medium text-sm">JPG</span>
+            </button>
           </div>
         </div>
       </div>
@@ -209,19 +208,19 @@
         <!-- Mini Bar -->
         <div
           x-data="{ activeTool: 'templates' }"
-          class="bg-white flex flex-col max-w-[90px] py-4 pb-[10px] h-full relative justify-between z-[99] shadow-md border-t border-gray-300"
+          class="bg-gray-50 flex flex-col max-w-[72px] py-4 h-full relative justify-between z-[99] shadow-sm border-r border-gray-200"
         >
           <!-- Items -->
           <div class="flex flex-col overflow-y-auto scrollbar-hide">
             <!-- Templates -->
             <div
               @click="activeTool = 'templates'; $dispatch('change-tool', { type: 'templates' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'templates' } }));"
-              :class="activeTool === 'templates' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'templates' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[21px] h-[21px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -234,18 +233,20 @@
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Templates</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Templates
+              </div>
             </div>
 
             <!-- Uploads -->
             <div
               @click="activeTool = 'uploads'; $dispatch('change-tool', { type: 'uploads' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'uploads' } }));"
-              :class="activeTool === 'uploads' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'uploads' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100 mt-2"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[21px] h-[21px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -256,18 +257,20 @@
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Uploads</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Uploads
+              </div>
             </div>
 
             <!-- Text -->
             <div
               @click="activeTool = 'text'; $dispatch('change-tool', { type: 'text' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'text' } }));"
-              :class="activeTool === 'text' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'text' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100 mt-2"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[18px] h-[18px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 189.127 189.127"
                   xmlns="http://www.w3.org/2000/svg"
                 >
@@ -277,18 +280,20 @@
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Text</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Text
+              </div>
             </div>
 
             <!-- Drawing -->
             <div
               @click="activeTool = 'drawing'; $dispatch('change-tool', { type: 'drawing' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'drawing' } }));"
-              :class="activeTool === 'drawing' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'drawing' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100 mt-2"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[21px] h-[21px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -305,62 +310,83 @@
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Drawing</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Drawing
+              </div>
             </div>
 
             <!-- Settings -->
             <div
               @click="activeTool = 'settings'; $dispatch('change-tool', { type: 'settings' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'settings' } }));"
-              :class="activeTool === 'settings' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'settings' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100 mt-2"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[21px] h-[21px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 32 32"
                   xmlns="http://www.w3.org/2000/svg"
                 >
                   <path
-                    d="M29 11.756h-1.526c-0.109-0.295-0.229-0.584-0.361-0.87l1.087-1.076c0.441-0.389 0.717-0.956 0.717-1.587 0-0.545-0.206-1.042-0.545-1.417l0.002 0.002-3.178-3.178c-0.373-0.338-0.87-0.544-1.415-0.544-0.632 0-1.199 0.278-1.587 0.718l-0.002 0.002-1.081 1.080c-0.285-0.131-0.573-0.251-0.868-0.36l0.008-1.526c0.003-0.042 0.005-0.091 0.005-0.141 0-1.128-0.884-2.049-1.997-2.109l-0.005-0h-4.496c-1.119 0.059-2.004 0.981-2.004 2.11 0 0.049 0.002 0.098 0.005 0.147l-0-0.007v1.524c-0.295 0.109-0.584 0.229-0.87 0.361l-1.074-1.084c-0.389-0.443-0.957-0.722-1.589-0.722-0.545 0-1.042 0.206-1.416 0.545l0.002-0.002-3.179 3.179c-0.338 0.373-0.544 0.87-0.544 1.415 0 0.633 0.278 1.2 0.719 1.587l0.002 0.002 1.078 1.079c-0.132 0.287-0.252 0.576-0.362 0.872l-1.525-0.007c-0.042-0.003-0.091-0.005-0.14-0.005-1.128 0-2.050 0.885-2.11 1.998l-0 0.005v4.495c0.059 1.119 0.982 2.005 2.111 2.005 0.049 0 0.098-0.002 0.146-0.005l-0.007 0h1.525c0.109 0.295 0.229 0.584 0.361 0.87l-1.084 1.071c-0.443 0.39-0.721 0.958-0.721 1.592 0 0.545 0.206 1.043 0.545 1.418l-0.002-0.002 3.179 3.178c0.339 0.337 0.806 0.545 1.322 0.545 0.007 0 0.014-0 0.021-0h-0.001c0.653-0.013 1.24-0.287 1.662-0.722l0.001-0.001 1.079-1.079c0.287 0.132 0.577 0.252 0.873 0.362l-0.007 1.524c-0.003 0.042-0.005 0.091-0.005 0.14 0 1.128 0.885 2.050 1.998 2.11l0.005 0h4.496c1.118-0.060 2.003-0.981 2.003-2.109 0-0.050-0.002-0.099-0.005-0.147l0 0.007v-1.526c0.296-0.11 0.585-0.23 0.872-0.362l1.069 1.079c0.423 0.435 1.009 0.709 1.66 0.723l0.002 0h0.002c0.006 0 0.014 0 0.021 0 0.515 0 0.982-0.207 1.323-0.541l3.177-3.177c0.335-0.339 0.541-0.805 0.541-1.32 0-0.009-0-0.018-0-0.028l0 0.001c-0.013-0.651-0.285-1.236-0.718-1.658l-0.001-0-1.080-1.081c0.131-0.285 0.251-0.573 0.36-0.868l1.525 0.007c0.042 0.003 0.090 0.005 0.139 0.005 1.129 0 2.051-0.885 2.11-1.999l0-0.005v-4.495c-0.060-1.119-0.981-2.004-2.11-2.004-0.049 0-0.098 0.002-0.147 0.005l0.007-0zM28.75 17.749l-2.162-0.011c-0.026 0-0.048 0.013-0.074 0.015-0.093 0.009-0.179 0.026-0.261 0.053l0.008-0.002c-0.31 0.068-0.565 0.263-0.711 0.527l-0.003 0.005c-0.048 0.071-0.091 0.152-0.124 0.238l-0.003 0.008c-0.008 0.024-0.027 0.041-0.034 0.066-0.23 0.804-0.527 1.503-0.898 2.155l0.025-0.048c-0.014 0.025-0.013 0.054-0.026 0.080-0.029 0.063-0.053 0.138-0.071 0.215l-0.001 0.008c-0.023 0.072-0.040 0.156-0.048 0.242l-0 0.005c-0.002 0.027-0.004 0.058-0.004 0.089 0 0.209 0.061 0.404 0.166 0.568l-0.003-0.004c0.045 0.088 0.096 0.163 0.154 0.232l-0.001-0.002c0.017 0.019 0.022 0.043 0.040 0.061l1.529 1.531-2.469 2.467-1.516-1.529c-0.020-0.021-0.048-0.027-0.069-0.046-0.060-0.050-0.128-0.096-0.2-0.135l-0.006-0.003c-0.195-0.109-0.429-0.173-0.677-0.173-0.002 0-0.004 0-0.006 0h0c-0.076 0.008-0.145 0.022-0.211 0.040l0.009-0.002c-0.102 0.020-0.192 0.050-0.276 0.089l0.007-0.003c-0.022 0.011-0.047 0.010-0.069 0.022-0.606 0.346-1.307 0.644-2.043 0.859l-0.070 0.017c-0.027 0.008-0.045 0.027-0.071 0.037-0.084 0.033-0.157 0.071-0.224 0.116l0.004-0.003c-0.075 0.041-0.139 0.085-0.199 0.135l0.002-0.002c-0.053 0.052-0.102 0.11-0.145 0.171l-0.003 0.004c-0.103 0.113-0.176 0.254-0.206 0.411l-0.001 0.005c-0.024 0.074-0.043 0.16-0.051 0.249l-0 0.005c-0.002 0.026-0.015 0.048-0.015 0.075l-0.001 2.162h-3.491l0.011-2.156c0-0.028-0.014-0.052-0.016-0.079-0.008-0.092-0.026-0.177-0.052-0.258l0.002 0.008c-0.068-0.313-0.265-0.57-0.531-0.717l-0.006-0.003c-0.070-0.047-0.15-0.089-0.235-0.122l-0.008-0.003c-0.024-0.008-0.042-0.027-0.067-0.034-0.806-0.23-1.507-0.528-2.161-0.9l0.048 0.025c-0.023-0.013-0.050-0.012-0.073-0.023-0.072-0.033-0.156-0.061-0.244-0.079l-0.008-0.001c-0.092-0.029-0.198-0.045-0.308-0.045-0.221 0-0.426 0.066-0.597 0.18l0.004-0.002c-0.076 0.040-0.141 0.084-0.201 0.134l0.002-0.002c-0.021 0.019-0.048 0.025-0.068 0.045l-1.529 1.529-2.47-2.469 1.532-1.516c0.020-0.020 0.027-0.047 0.045-0.067 0.053-0.063 0.101-0.134 0.142-0.209l0.003-0.006c0.037-0.058 0.071-0.124 0.099-0.194l0.003-0.008c0.038-0.14 0.062-0.301 0.066-0.467l0-0.003c-0.008-0.083-0.023-0.158-0.044-0.231l0.002 0.009c-0.020-0.094-0.047-0.177-0.083-0.255l0.003 0.007c-0.012-0.025-0.011-0.052-0.025-0.076-0.347-0.605-0.645-1.305-0.858-2.041l-0.017-0.068c-0.007-0.026-0.027-0.045-0.036-0.070-0.034-0.086-0.072-0.16-0.118-0.228l0.003 0.005c-0.040-0.074-0.084-0.138-0.133-0.197l0.002 0.002c-0.052-0.053-0.109-0.101-0.169-0.144l-0.004-0.003c-0.060-0.051-0.128-0.097-0.2-0.136l-0.006-0.003c-0.057-0.026-0.126-0.049-0.196-0.066l-0.008-0.002c-0.077-0.026-0.167-0.045-0.259-0.053l-0.005-0c-0.026-0.002-0.047-0.015-0.073-0.015l-2.162-0.001v-3.492l2.162 0.011c0.16-0.002 0.311-0.035 0.45-0.092l-0.008 0.003c0.054-0.024 0.099-0.048 0.142-0.075l-0.005 0.003c0.090-0.047 0.168-0.1 0.239-0.16l-0.002 0.001c0.043-0.039 0.082-0.079 0.118-0.122l0.002-0.002c0.056-0.065 0.106-0.138 0.147-0.215l0.003-0.007c0.027-0.047 0.054-0.102 0.076-0.159l0.003-0.008c0.010-0.028 0.029-0.050 0.037-0.078 0.23-0.805 0.527-1.506 0.899-2.159l-0.025 0.048c0.014-0.024 0.013-0.052 0.025-0.076 0.031-0.067 0.057-0.147 0.075-0.229l0.001-0.008c0.020-0.086 0.032-0.185 0.032-0.287 0-0.317-0.113-0.607-0.3-0.834l0.002 0.002c-0.017-0.020-0.023-0.045-0.042-0.063l-1.527-1.529 2.469-2.469 1.518 1.531c0.055 0.045 0.116 0.087 0.18 0.122l0.006 0.003c0.042 0.033 0.089 0.065 0.138 0.094l0.006 0.003c0.16 0.088 0.35 0.142 0.551 0.148l0.002 0 0.005 0.001c0.012 0 0.023-0.009 0.034-0.009 0.186-0.008 0.359-0.056 0.513-0.135l-0.007 0.003c0.022-0.011 0.047-0.006 0.070-0.018 0.605-0.346 1.305-0.645 2.041-0.858l0.069-0.017c0.025-0.007 0.042-0.026 0.066-0.034 0.091-0.035 0.17-0.076 0.243-0.125l-0.004 0.003c0.069-0.038 0.128-0.079 0.183-0.124l-0.002 0.002c0.058-0.056 0.11-0.117 0.156-0.183l0.003-0.004c0.046-0.056 0.089-0.119 0.126-0.185l0.003-0.006c0.028-0.062 0.053-0.135 0.070-0.21l0.002-0.008c0.024-0.073 0.042-0.158 0.050-0.247l0-0.005c0.002-0.027 0.015-0.049 0.015-0.076l0.001-2.162h3.491l-0.011 2.156c-0 0.028 0.014 0.051 0.015 0.079 0.008 0.093 0.026 0.178 0.052 0.26l-0.002-0.008c0.019 0.084 0.044 0.157 0.075 0.227l-0.003-0.008c0.040 0.073 0.082 0.136 0.13 0.194l-0.002-0.002c0.048 0.070 0.101 0.131 0.158 0.187l0 0c0.053 0.044 0.112 0.084 0.174 0.12l0.006 0.003c0.068 0.046 0.147 0.087 0.23 0.119l0.008 0.003c0.025 0.009 0.043 0.028 0.069 0.035 0.804 0.229 1.503 0.527 2.155 0.899l-0.047-0.025c0.022 0.012 0.046 0.007 0.068 0.018 0.147 0.076 0.32 0.124 0.503 0.132l0.003 0c0.012 0 0.024 0.009 0.036 0.009l0.028-0.008c0.193-0.008 0.372-0.059 0.531-0.143l-0.007 0.003c0.059-0.033 0.109-0.066 0.156-0.104l-0.003 0.002c0.068-0.037 0.127-0.076 0.181-0.12l-0.002 0.002 1.531-1.528 2.469 2.47-1.531 1.516c-0.020 0.020-0.027 0.047-0.046 0.068-0.053 0.063-0.101 0.134-0.142 0.209l-0.003 0.006c-0.084 0.123-0.138 0.272-0.148 0.434l-0 0.002c-0.013 0.056-0.020 0.121-0.020 0.187 0 0.097 0.016 0.19 0.045 0.277l-0.002-0.006c0.020 0.094 0.047 0.176 0.083 0.254l-0.003-0.007c0.012 0.025 0.011 0.053 0.025 0.078 0.347 0.604 0.645 1.303 0.858 2.038l0.017 0.068c0.008 0.030 0.028 0.052 0.038 0.080 0.024 0.062 0.049 0.113 0.077 0.163l-0.003-0.006c0.211 0.397 0.619 0.665 1.090 0.674l0.001 0 2.162 0.001zM16 10.75c-2.899 0-5.25 2.351-5.25 5.25s2.351 5.25 5.25 5.25c2.899 0 5.25-2.351 5.25-5.25v0c-0.004-2.898-2.352-5.246-5.25-5.25h-0zM16 18.75c-1.519 0-2.75-1.231-2.75-2.75s1.231-2.75 2.75-2.75c1.519 0 2.75 1.231 2.75 2.75v0c-0.002 1.518-1.232 2.748-2.75 2.75h-0z"
+                    d="M29 11.756h-1.526c-0.109-0.295-0.229-0.584-0.361-0.87l1.087-1.076c0.441-0.389 0.717-0.956 0.717-1.587 0-0.545-0.206-1.042-0.545-1.417l0.002 0.002-3.178-3.178c-0.373-0.338-0.87-0.544-1.415-0.544-0.632 0-1.199 0.278-1.587 0.718l-0.002 0.002-1.081 1.080c-0.285-0.131-0.573-0.251-0.868-0.36l0.008-1.526c0.003-0.042 0.005-0.091 0.005-0.141 0-1.128-0.884-2.049-1.997-2.109l-0.005-0h-4.496c-1.119 0.059-2.004 0.981-2.004 2.11 0 0.049 0.002 0.098 0.005 0.147l-0-0.007v1.524c-0.295 0.109-0.584 0.229-0.87 0.361l-1.074-1.084c-0.389-0.443-0.957-0.722-1.589-0.722-0.545 0-1.042 0.206-1.416 0.545l0.002-0.002-3.179 3.179c-0.338 0.373-0.544 0.87-0.544 1.415 0 0.633 0.278 1.2 0.719 1.587l0.002 0.002 1.078 1.079c-0.132 0.287-0.252 0.576-0.362 0.872l-1.525-0.007c-0.042-0.003-0.091-0.005-0.14-0.005-1.128 0-2.050 0.885-2.11 1.998l-0 0.005v4.495c0.059 1.119 0.982 2.005 2.111 2.005 0.049 0 0.098-0.002 0.146-0.005l-0.007 0h1.525c0.109 0.295 0.229 0.584 0.361 0.87l-1.084 1.071c-0.443 0.39-0.721 0.958-0.721 1.592 0 0.545 0.206 1.043 0.545 1.418l-0.002-0.002 3.179 3.178c0.339 0.337 0.806 0.545 1.322 0.545 0.007 0 0.014-0 0.021-0h-0.001c0.653-0.013 1.24-0.287 1.662-0.722l0.001-0.001 1.079-1.079c0.287 0.132 0.577 0.252 0.873 0.362l-0.007 1.524c-0.003 0.042-0.005 0.091-0.005 0.14 0 1.128 0.885 2.050 1.998 2.11l0.005 0h4.496c1.118-0.060 2.003-0.981 2.003-2.109 0-0.050-0.002-0.099-0.005-0.147l0 0.007v-1.526c0.296-0.11 0.585-0.23 0.872-0.362l1.069 1.079c0.423 0.435 1.009 0.709 1.66 0.723l0.002 0h0.002c0.006 0 0.014 0 0.021 0 0.515 0 0.982-0.207 1.323-0.541l3.177-3.177c0.335-0.339 0.541-0.805 0.541-1.32 0-0.009-0-0.018-0-0.028l0 0.001c-0.013-0.651-0.285-1.236-0.718-1.658l-0.001-0-1.080-1.081c0.131-0.285 0.251-0.573 0.36-0.868l1.525 0.007c0.042 0.003 0.090 0.005 0.139 0.005 1.129 0 2.051-0.885 2.11-1.999l0-0.005v-4.495c-0.060-1.119-0.981-2.004-2.11-2.004-0.049 0-0.098 0.002-0.147 0.005l0.007-0zM16 10.75c-2.899 0-5.25 2.351-5.25 5.25s2.351 5.25 5.25 5.25c2.899 0 5.25-2.351 5.25-5.25v0c-0.004-2.898-2.352-5.246-5.25-5.25h-0zM16 18.75c-1.519 0-2.75-1.231-2.75-2.75s1.231-2.75 2.75-2.75c1.519 0 2.75 1.231 2.75 2.75v0c-0.002 1.518-1.232 2.748-2.75 2.75h-0z"
                     fill="currentColor"
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Settings</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Settings
+              </div>
             </div>
 
             <!-- Categories Area -->
-            <hr class="w-full my-2 border-gray-200" />
+            <hr class="w-full my-3 border-gray-200" />
 
             <!-- Clip Arts -->
             <div
               @click="activeTool = 'clip_arts'; $dispatch('change-tool', { type: 'clip_arts' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'clip_arts' } }));"
-              :class="activeTool === 'clip_arts' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'clip_arts' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100"
             >
-              <div class="mb-1">
-                <img
-                  src="./images/icons/clip-art.svg"
-                  alt="Clip Art"
-                  class="w-[21px] h-[21px]"
-                />
+              <div class="mb-2">
+                <svg
+                  class="w-[22px] h-[22px] text-gray-800"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                    fill="currentColor"
+                  />
+                </svg>
               </div>
-              <div class="text-xs text-center">Clip Arts</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Clip Arts
+              </div>
             </div>
+
             <!-- Mask -->
             <div
               @click="activeTool = 'mask'; $dispatch('change-tool', { type: 'mask' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'mask' } }));"
-              :class="activeTool === 'mask' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'mask' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100 mt-2"
             >
-              <div class="mb-1">
-                <img
-                  src="./images/icons/mask.svg"
-                  alt="Mask"
-                  class="w-[21px] h-[21px]"
-                />
+              <div class="mb-2">
+                <svg
+                  class="w-[22px] h-[22px] text-gray-800"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9c.83 0 1.5-.67 1.5-1.5S7.83 8 7 8s-1.5.67-1.5 1.5S6.17 11 7 11zm5-3c.83 0 1.5-.67 1.5-1.5S12.83 5 12 5s-1.5.67-1.5 1.5S11.17 8 12 8zm5 3c.83 0 1.5-.67 1.5-1.5S17.83 8 17 8s-1.5.67-1.5 1.5.67 1.5 1.5 1.5z"
+                    fill="currentColor"
+                  />
+                </svg>
               </div>
-              <div class="text-xs text-center">Mask</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Mask
+              </div>
             </div>
           </div>
 
@@ -369,12 +395,12 @@
             <!-- Layers -->
             <div
               @click="activeTool = 'layers'; $dispatch('change-tool', { type: 'layers' }); window.dispatchEvent(new CustomEvent('tool-changed', { detail: { type: 'layers' } }));"
-              :class="activeTool === 'layers' ? 'bg-gray-100' : ''"
-              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-50"
+              :class="activeTool === 'layers' ? 'bg-gray-200 rounded-md mx-2' : ''"
+              class="flex flex-col items-center py-3 px-2 cursor-pointer hover:bg-gray-100"
             >
-              <div class="mb-1">
+              <div class="mb-2">
                 <svg
-                  class="w-[21px] h-[21px] text-gray-800"
+                  class="w-[22px] h-[22px] text-gray-800"
                   viewBox="0 0 24 24"
                   xmlns="http://www.w3.org/2000/svg"
                 >
@@ -384,7 +410,9 @@
                   ></path>
                 </svg>
               </div>
-              <div class="text-xs text-center">Layers</div>
+              <div class="text-xs text-center font-medium text-gray-800">
+                Layers
+              </div>
             </div>
           </div>
         </div>
@@ -1116,35 +1144,8 @@
               <h3 class="text-lg font-medium text-gray-800">Text</h3>
             </div>
 
-            <div x-show="selectedObject && selectedObject.type === 'text'">
-              <input
-                type="text"
-                x-model="selectedObject.text"
-                @input="selectedObject.set('text', $event.target.value); window.canvas.renderAll()"
-                class="w-full p-2 border rounded"
-              />
-            </div>
-
             <!-- Panel Body -->
             <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              <!-- Add Text Button -->
-              <button
-                @click="addText()"
-                class="flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded cursor-pointer transition"
-              >
-                <svg
-                  class="w-[17px] h-[17px] text-gray-700"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 448 512"
-                >
-                  <path
-                    fill="currentColor"
-                    d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"
-                  />
-                </svg>
-                <span>Add Text</span>
-              </button>
-
               <!-- Pre-Built Headings -->
               <div class="flex flex-col gap-2">
                 <div
@@ -1168,10 +1169,7 @@
               </div>
 
               <!-- Text Tools -->
-              <div
-                x-show="selectedObject && (selectedObject.type === 'text' || selectedObject.type === 'curved-text')"
-                class="space-y-4"
-              >
+              <div x-show="selectedObject" class="space-y-4">
                 <!-- Text Modify Buttons -->
                 <div class="flex items-center gap-2">
                   <!-- Color Picker -->
@@ -1182,7 +1180,7 @@
                       type="color"
                       class="w-12 h-12 transform -translate-x-1 -translate-y-1"
                       x-model="textProperties.fill"
-                      @input="updateObjectProperty('fill', $event.target.value)"
+                      @input="updateTextProperty('fill', $event.target.value)"
                     />
                   </div>
 
@@ -1268,18 +1266,15 @@
 
                   <div class="flex items-center gap-2">
                     <!-- Font Family Dropdown -->
-                    <div
-                      x-data="{ open: false, search: '', filteredFonts: [] }"
-                      class="relative w-full"
-                    >
+                    <div class="relative w-full">
                       <div
-                        @click="open = !open"
+                        @click="showFontDropdown = !showFontDropdown"
                         class="flex items-center justify-between p-2 bg-gray-100 rounded cursor-pointer"
                       >
                         <span x-text="textProperties.fontFamily">Roboto</span>
                         <svg
                           class="w-4 h-4 transition-transform"
-                          :class="open ? 'rotate-180' : ''"
+                          :class="showFontDropdown ? 'rotate-180' : ''"
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 -960 960 960"
                         >
@@ -1288,38 +1283,35 @@
                             d="M480-333 240-573l51-51 189 189 189-189 51 51-240 240Z"
                           />
                         </svg>
-                      </div>
 
-                      <div
-                        x-show="open"
-                        @click.away="open = false"
-                        x-transition
-                        class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg"
-                      >
-                        <!-- Search Bar -->
-                        <div class="p-2 border-b border-gray-200">
-                          <input
-                            type="text"
-                            x-model="search"
-                            @input="filterFonts()"
-                            placeholder="Search fonts..."
-                            class="w-full p-2 border border-gray-300 rounded"
-                          />
-                        </div>
+                        <div
+                          x-show="showFontDropdown"
+                          @click.away="showFontDropdown = false"
+                          x-transition
+                          class="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg"
+                        >
+                          <!-- Search Bar -->
+                          <div class="p-2 border-b border-gray-200">
+                            <input
+                              type="text"
+                              x-model="fontSearch"
+                              @input="filterFonts()"
+                              placeholder="Search fonts..."
+                              class="w-full p-2 border border-gray-300 rounded"
+                            />
+                          </div>
 
-                        <!-- Font List -->
-                        <div class="max-h-60 overflow-y-auto p-1">
-                          <template
-                            x-for="font in search ? filteredFonts : fonts"
-                            :key="font"
-                          >
-                            <div
-                              @click="selectFont(font); open = false"
-                              class="p-2 hover:bg-gray-100 rounded cursor-pointer"
-                              :style="`font-family: ${font}`"
-                              x-text="font"
-                            ></div>
-                          </template>
+                          <!-- Font List -->
+                          <div class="max-h-60 overflow-y-auto p-1">
+                            <template x-for="font in filteredFonts" :key="font">
+                              <div
+                                @click="selectFont(font); showFontDropdown = false"
+                                class="p-2 hover:bg-gray-100 rounded cursor-pointer"
+                                :style="`font-family: ${font}`"
+                                x-text="font"
+                              ></div>
+                            </template>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1449,6 +1441,12 @@
                           @change="updateCurveFromAngle($event.target.value)"
                         />
                       </div>
+                      <div
+                        class="flex items-center text-xs text-gray-500 justify-between mb-1"
+                      >
+                        <span>Outward</span>
+                        <span>Inward</span>
+                      </div>
                       <input
                         type="range"
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
@@ -1457,6 +1455,21 @@
                         x-model="curveValue"
                         @input="updateTextCurve($event.target.value)"
                       />
+                      <div class="mt-1 text-xs text-gray-500 text-center">
+                        <span
+                          x-text="getPercentageFromRange(curveValue) + '%'"
+                        ></span>
+                      </div>
+                    </div>
+
+                    <!-- Reset Button -->
+                    <div class="mt-2 text-center">
+                      <button
+                        @click="curveValue = 2500; updateTextCurve(2500);"
+                        class="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+                      >
+                        Reset Curve
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2460,26 +2473,29 @@
         <!-- Quick Options Bar -->
         <div
           x-data="quickOptionsBar"
-          class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-md px-2 py-1 flex items-center gap-1 z-10"
+          class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white rounded-full shadow-md px-6 py-2.5 flex items-center gap-3 z-10"
         >
           <!-- Canvas Alignment -->
-          <div
-            class="flex items-center"
-            :class="{'opacity-50 pointer-events-none': !hasSelection}"
-          >
+          <div class="flex items-center gap-1">
             <!-- Left -->
             <button
               @click="alignObjects('left')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M4 3c.41 0 .75.34.75.75v16.5a.75.75 0 1 1-1.5 0V3.75c0-.41.34-.75.75-.75zm5 3h9a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8c0-1.1.9-2 2-2zm0 7h4a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-1c0-1.1.9-2 2-2zm0-5.5a.5.5 0 0 0-.5.5v1c0 .28.22.5.5.5h9a.5.5 0 0 0 .5-.5V8a.5.5 0 0 0-.5-.5H9zm0 7a.5.5 0 0 0-.5.5v1c0 .28.22.5.5.5h4a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5H9z"
+                  d="M4 3c.41 0 .75.34.75.75v16.5a.75.75 0 1 1-1.5 0V3.75c0-.41.34-.75.75-.75zm5 3h9a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8c0-1.1.9-2 2-2z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
@@ -2487,16 +2503,22 @@
             <!-- Center Horizontal -->
             <button
               @click="alignObjects('centerH')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M11.25 13v-2H7a2 2 0 0 1-2-2V8c0-1.1.9-2 2-2h4.25V3.75a.75.75 0 1 1 1.5 0V6H17a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-4.25v2H14a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-1.25v2.25a.75.75 0 1 1-1.5 0V18H10a2 2 0 0 1-2-2v-1c0-1.1.9-2 2-2h1.25zM7 7.5a.5.5 0 0 0-.5.5v1c0 .28.22.5.5.5h10a.5.5 0 0 0 .5-.5V8a.5.5 0 0 0-.5-.5H7zm3 7a.5.5 0 0 0-.5.5v1c0 .28.22.5.5.5h4a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-4z"
+                  d="M12 3.75v16.5M7 8h10a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
@@ -2504,33 +2526,48 @@
             <!-- Right -->
             <button
               @click="alignObjects('right')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M20 3a.75.75 0 0 0-.75.75v16.5a.75.75 0 1 0 1.5 0V3.75A.75.75 0 0 0 20 3zm-5 3H6a2 2 0 0 0-2 2v1c0 1.1.9 2 2 2h9a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm0 7h-4a2 2 0 0 0-2 2v1c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2zm0-5.5c.28 0 .5.22.5.5v1a.5.5 0 0 1-.5.5H6a.5.5 0 0 1-.5-.5V8c0-.28.22-.5.5-.5h9zm0 7c.28 0 .5.22.5.5v1a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5v-1c0-.28.22-.5.5-.5h4z"
+                  d="M20 3c-.41 0-.75.34-.75.75v16.5a.75.75 0 1 0 1.5 0V3.75c0-.41-.34-.75-.75-.75zm-5 3H6a2 2 0 0 0-2 2v1c0 1.1.9 2 2 2h9a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
+          </div>
 
+          <!-- Vertical Alignment -->
+          <div class="flex items-center gap-1">
             <!-- Top -->
             <button
               @click="alignObjects('top')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M21 4c0 .41-.34.75-.75.75H3.75a.75.75 0 0 1 0-1.5h16.5c.41 0 .75.34.75.75zM11 9v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2zm7 0v4a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2V9c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2zM9.5 9a.5.5 0 0 0-.5-.5H8a.5.5 0 0 0-.5.5v9c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5V9zm7 0a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v4c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5V9z"
+                  d="M3.75 4h16.5M9 7v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
@@ -2538,16 +2575,22 @@
             <!-- Center Vertical -->
             <button
               @click="alignObjects('centerV')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M11 11.25h2V7c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2v4.25h2.25a.75.75 0 1 1 0 1.5H18V17a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-4.25h-2V14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-1.25H3.75a.75.75 0 1 1 0-1.5H6V10c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2v1.25zM16.5 7a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v10c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5V7zm-7 3a.5.5 0 0 0-.5-.5H8a.5.5 0 0 0-.5.5v4c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5v-4z"
+                  d="M3.75 12h16.5M8 7v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
@@ -2555,110 +2598,88 @@
             <!-- Bottom -->
             <button
               @click="alignObjects('bottom')"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+              :class="{'opacity-50 pointer-events-none': !hasSelection}"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5 text-gray-400"
                 viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path
-                  fill="currentColor"
-                  d="M21 20c0 .41-.34.75-.75.75H3.75a.75.75 0 1 1 0-1.5h16.5c.41 0 .75.34.75.75zM11 6v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2zm7 5v4a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-4c0-1.1.9-2 2-2h1a2 2 0 0 1 2 2zM9.5 6a.5.5 0 0 0-.5-.5H8a.5.5 0 0 0-.5.5v9c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5V6zm7 5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v4c0 .28.22.5.5.5h1a.5.5 0 0 0 .5-.5v-4z"
+                  d="M3.75 20h16.5M9 7v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1z"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  fill="none"
                 />
               </svg>
             </button>
-
-            <div class="h-6 w-px bg-gray-300 mx-1"></div>
           </div>
+
+          <!-- Separator -->
+          <div class="h-8 w-px bg-gray-200 mx-1"></div>
 
           <!-- Crop Tools -->
           <div class="flex items-center">
-            <!-- Start Crop -->
+            <!-- Crop Tool -->
             <button
-              x-show="!cropActive && canCrop"
               @click="startCrop"
+              class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
               :class="{'opacity-50 pointer-events-none': !canCrop}"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
+              x-show="!cropActive && canCrop"
             >
               <svg
-                class="w-[17px] h-[17px] text-gray-700"
+                class="w-5 h-5 text-gray-400"
+                viewBox="0 0 24 24"
+                fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 -960 960 960"
               >
                 <path
-                  fill="currentColor"
-                  d="M680-40v-160H280q-33 0-56.5-23.5T200-280v-400H40v-80h160v-160h80v640h640v80H760v160h-80Zm0-320v-320H360v-80h320q33 0 56.5 23.5T760-680v320h-80Z"
+                  d="M7 17h10v-2m0 0V7h-2m2 8H7V7m10 0h2m-2 12v2m-8-2H5m2-12V3"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                 />
               </svg>
             </button>
-
-            <!-- Apply Crop -->
-            <button
-              x-show="cropActive"
-              @click="applyCrop"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
-            >
-              <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 -960 960 960"
-              >
-                <path
-                  fill="currentColor"
-                  d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
-                />
-              </svg>
-            </button>
-
-            <!-- Reset Crop -->
-            <button
-              x-show="cropActive"
-              @click="resetCrop"
-              class="p-2 rounded-full hover:bg-gray-100 transition"
-            >
-              <svg
-                class="w-[17px] h-[17px] text-gray-700"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 -960 960 960"
-              >
-                <path
-                  fill="currentColor"
-                  d="M440-122q-121-15-200.5-105.5T160-440q0-66 26-126.5T260-672l57 57q-38 34-57.5 79T240-440q0 88 56 155.5T440-202v80Zm80 0v-80q87-16 143.5-83T720-440q0-100-70-170t-170-70h-3l44 44-56 56-140-140 140-140 56 56-44 44h3q134 0 227 93t93 227q0 121-79.5 211.5T520-122Z"
-                />
-              </svg>
-            </button>
-
-            <div
-              class="h-6 w-px bg-gray-300 mx-1"
-              x-show="hasSelection || cropActive"
-            ></div>
           </div>
+
+          <!-- Separator -->
+          <div class="h-8 w-px bg-gray-200 mx-1"></div>
 
           <!-- Delete -->
           <button
-            x-show="hasSelection && !cropActive"
             @click="deleteSelected"
-            class="p-2 rounded-full hover:bg-gray-100 transition"
+            class="p-1.5 rounded-md hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+            :class="{'opacity-50 pointer-events-none': !hasSelection}"
+            x-show="hasSelection && !cropActive"
           >
             <svg
-              class="w-[14px] h-[14px] text-gray-700"
+              class="w-5 h-5 text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 448 512"
             >
               <path
-                fill="currentColor"
-                d="M32 464a48 48 0 0 0 48 48h288a48 48 0 0 0 48-48V128H32zm272-256a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zm-96 0a16 16 0 0 1 32 0v224a16 16 0 0 1 -32 0zM432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.7 23.7 0 0 0 -21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0 -16-16z"
+                d="M5 8h14m-9 3v6m4-6v6M9 5h6m-3-2h.01M7 5h10v13a2 2 0 01-2 2H9a2 2 0 01-2-2V5z"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               />
             </svg>
           </button>
         </div>
 
-        <!-- In your HTML, update the canvas container to use this component -->
+        <!-- Canvas Area Container -->
         <div
           x-data="canvasManager"
-          class="border border-gray-300 mx-auto overflow-hidden"
-          style="width: 800px; height: 600px"
+          class="bg-white border border-gray-300 rounded-md mx-auto ms-10 mt-10 overflow-hidden shadow-sm"
+          style="width: 600px; height: 500px"
         >
           <canvas
             id="image-editor"
