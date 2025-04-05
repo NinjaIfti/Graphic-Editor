@@ -37,7 +37,7 @@ import { objectManipulationComponent } from "./components/core/object-manipulati
 
 // panel components
 import { templatesPanelComponent } from "./components/panels/templates-panel.js";
-import { textPanelComponent } from "./components/panels/textPanel.js";
+import { textPanelComponent } from "./components/panels/text-panel.js";
 import { uploadsPanelComponent } from "./components/panels/uploads-panel.js";
 import { drawingPanelComponent } from "./components/panels/drawing-panel.js";
 import { layersPanelComponent } from "./components/panels/layers-panel.js";
