@@ -1,15 +1,18 @@
-// src/app.js - entry point
 import Alpine from "alpinejs";
-import * as fabric from "fabric";
-import { setupGlobalUtilities, registerAllComponents } from "./fabric.js";
+import * as fabric from 'fabric';
+import fabricComponent from "./fabric.js";  // Your custom fabric component
 
+// Make Alpine globally available
 window.Alpine = Alpine;
-window.fabric = fabric;
+
+// Register the fabric components globally
+window.fabric = fabric; 
+
+// Register the unified fabric component with Alpine.js
+Alpine.data('fabric', fabricComponent);
 
 document.addEventListener("alpine:init", () => {
-  setupGlobalUtilities();
-  registerAllComponents(Alpine);
-  console.log("Steve Editor components registered in fabric.js!");
+  console.log("Steve Editor initialized with unified fabric component!");
 });
 
-Alpine.start();
+Alpine.start(); // Start Alpine.js
