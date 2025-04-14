@@ -1,9 +1,4 @@
 export default function initCurvedText(fabric) {
-  /*
-   * CurvedText object for fabric.js
-   * @author Arjan Haverkamp (av01d)
-   * @date January 2018
-   */
   fabric.CurvedText = fabric.util.createClass(fabric.Object, {
     type: "curved-text",
     diameter: 250,
