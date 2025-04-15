@@ -1,6 +1,7 @@
 // Text panel properties and methods - Fabric.js v6 syntax with direct method calls
-import { Textbox, Path } from 'fabric';
 import { addToHistory } from '../utils/history-manager';
+import { Textbox } from 'fabric';
+import { CurvedText, addCurveText, getRangeFromPercentage, calculateAngleFromCurveValue } from '../utils/curve-text';
 
 export default function textComponent() {
     return {
@@ -457,96 +458,84 @@ export default function textComponent() {
         updateTextCurve(value) {
             this.curveValue = parseInt(value);
 
-            // Call canvas manager's method directly if available
-            if (this.canvasManager && typeof this.canvasManager.updateTextCurve === 'function') {
-                this.canvasManager.updateTextCurve(this.curveValue);
-                return;
-            }
-
-            // Fallback implementation
             if (!window.canvas) return;
 
             const activeObject = window.canvas.getActiveObject();
-            if (activeObject && activeObject.type.includes('text')) {
-                try {
-                    // Save original position and dimensions
-                    const originalLeft = activeObject.left;
-                    const originalTop = activeObject.top;
-                    const originalWidth = activeObject.width * (activeObject.scaleX || 1);
-                    const originalHeight = activeObject.height * (activeObject.scaleY || 1);
+            if (!activeObject || !activeObject.type.includes('text')) return;
 
-                    // Remove any existing path
-                    if (this.curveValue === 0) {
-                        activeObject.set({
-                            path: null,
-                            left: originalLeft,
-                            top: originalTop
+            let percentage = this.curveValue >= 2500 ?
+                (this.curveValue - 2500) / 25 :
+                -((2500 - this.curveValue) / 25);
+
+            percentage = percentage.toFixed(0);
+            if (percentage == -0 || percentage == "-0") percentage = 0;
+
+            if (percentage > 90) {
+                percentage = 90;
+                this.curveValue = getRangeFromPercentage(percentage);
+            }
+
+            if (percentage < -90) {
+                percentage = -90;
+                this.curveValue = getRangeFromPercentage(percentage);
+            }
+
+            const isFlipped = percentage < 0;
+            const hasCurveApply = parseInt(percentage) != 0;
+
+            // Calculate diameter for curved text
+            let diameter = this.curveValue;
+            if (this.curveValue > 2500) {
+                // For right side of the slider, we need to mirror around 2500 for diameter
+                // but KEEP the curveValue for the UI slider position
+                diameter = 2500 - (this.curveValue - 2500);
+            }
+
+            const angle = (percentage * 3.6).toFixed(0);
+
+            const isCurvedText = activeObject.type === "curved-text";
+
+            try {
+                if (hasCurveApply && !isCurvedText) {
+                    // Convert normal text to curved text
+                    const curvedText = addCurveText(window.canvas, activeObject, diameter, percentage);
+                    this.selectedObject = curvedText;
+                    this.syncTextProperties(curvedText);
+                } else if (!hasCurveApply) {
+                    // Convert curved text back to normal text
+                    if (isCurvedText) {
+                        activeObject.stroke = activeObject.strokeStyle;
+                        const text = new Textbox(activeObject.text, {
+                            ...activeObject,
+                            percentage,
                         });
-                    } else {
-                        // Calculate radius based on curve value
-                        const radius = Math.abs(100 / this.curveValue) * 100;
 
-                        // Create path centered on text's bounding box
-                        const startX = -originalWidth / 2;
-                        const endX = originalWidth / 2;
+                        window.canvas.remove(activeObject);
+                        window.canvas.add(text);
+                        window.canvas.setActiveObject(text);
 
-                        // Create the arc path
-                        const pathData = [
-                            ['M', startX, 0],
-                            ['A', radius, radius, 0, 0, this.curveValue > 0 ? 1 : 0, endX, 0]
-                        ];
-
-                        // Create the path with the same position as the text
-                        const path = new Path(pathData, {
-                            left: originalLeft,
-                            top: originalTop,
-                            originX: 'center',
-                            originY: 'center',
-                            fill: '',
-                            stroke: '',
-                            visible: false
-                        });
-
-                        // Apply path to text object and ensure it stays in the same position
-                        activeObject.set({
-                            path: path,
-                            pathAlign: 'center',
-                            left: originalLeft,
-                            top: originalTop
-                        });
-
-                        // After applying path, adjust if needed to keep text within bounds
-                        // Wait for Fabric to update the object before final positioning
-                        setTimeout(() => {
-                            // Get new bounding box
-                            const boundingRect = activeObject.getBoundingRect();
-
-                            // Calculate any needed adjustments to keep text in original bounds
-                            const heightDiff = boundingRect.height - originalHeight;
-
-                            // Adjust position if text is moving out of bounds
-                            if (heightDiff > 0) {
-                                // Adjust by half the height difference to keep centered
-                                activeObject.set({
-                                    top: originalTop - (this.curveValue > 0 ? heightDiff/2 : -heightDiff/2)
-                                });
-                                activeObject.setCoords();
-                                window.canvas.requestRenderAll();
-                            }
-                        }, 0);
+                        this.selectedObject = text;
+                        this.syncTextProperties(text);
                     }
-
-                    // Update canvas
-                    activeObject.setCoords();
-                    window.canvas.requestRenderAll();
-
-                    // Add to history
-                    if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
-                        window.fabricComponent.addToHistory();
-                    }
-                } catch (error) {
-                    // Silent error handling
+                } else if (hasCurveApply && isCurvedText) {
+                    // Update existing curved text
+                    activeObject.set("_cachedCanvas", null);
+                    activeObject.set("diameter", diameter);
+                    activeObject.set("flipped", isFlipped);
+                    activeObject.set("percentage", percentage);
+                    activeObject.set("rotateAngle", angle);
+                    activeObject._updateObj("scaleX", activeObject.scaleX);
+                    activeObject._updateObj("scaleY", activeObject.scaleY);
                 }
+
+                window.canvas.requestRenderAll();
+
+                // Add to history
+                if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
+                }
+            } catch (error) {
+                console.error("Error updating text curve:", error);
             }
         },
 

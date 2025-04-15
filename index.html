@@ -201,7 +201,7 @@
     <div class="flex h-[calc(100%-55px)]">
       <!--Sidebar wrapper-->
       <div class="flex gap-[10px]">
-        <!-- Left Side Mini Bar -->
+        <!--  Mini Bar -->
         <div class="bg-white flex flex-col max-w-[90px] py-4 fixed left-0 top-0 bottom-0 h-screen relative justify-between z-[99] shadow-sm border-r border-[#ddd]">
           <!-- Items -->
           <div class="flex flex-col overflow-y-auto scrollbar-hide">
@@ -1522,21 +1522,24 @@
                     <input
                             type="range"
                             class="w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10 opacity-0 absolute"
-                            min="-100"
-                            max="100"
+                            min="0"
+                            max="5000"
+                            value="2500"
                             step="1"
                             x-model="text.curveValue"
                             @input="text.updateTextCurve($event.target.value)"
                     />
                     <div class="w-full h-1 bg-[#ebebeb] rounded-lg"></div>
-                    <div
-                            class="absolute -top-3 w-5 h-5 bg-[#6b7280] rounded-full"
-                            :style="`left: calc(${(parseInt(text.curveValue) + 100) / 200 * 100}% - 10px); top: 4px;`"
-                    ></div>
+                    <div class="absolute top-[-0.5px] h-2 w-[1px] bg-black left-1/2 transform -translate-x-1/2"></div>
                     <div
                             class="absolute -top-3 w-5 h-5 bg-[#37495d] rounded-full"
-                            :style="`left: calc(${(parseInt(text.curveValue) + 100) / 200 * 100}% - 12px); top: 2px;`"
+                            :style="`left: calc(${text.curveValue / 5000 * 100}% - 10px); top: 2px;`"
                     ></div>
+                  </div>
+                  <div class="flex justify-between text-xs text-gray-500">
+                    <span>-360°</span>
+                    <span>0°</span>
+                    <span>360°</span>
                   </div>
                 </div>
 
