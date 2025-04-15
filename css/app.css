@@ -1,0 +1,29 @@
+@import "tailwindcss";
+@import './custom.css';
+
+/* Hide Alpine elements before Alpine.js initializes */
+[x-cloak] {
+    display: none !important;
+}
+.background-image {
+    background-image: radial-gradient(#333 8%, transparent 8%);
+    background-size: 20px 20px;
+    background-color: #000;
+}
+
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+#image-editor {
+    -webkit-user-drag: element;
+    aspect-ratio: auto 1257 / 798;
+}
