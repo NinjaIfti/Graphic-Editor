@@ -1,386 +1,378 @@
-// src/components/layers.js
-import {addToHistory} from '../utils/history-manager';
-import {Circle, Rect, Textbox} from "fabric";
-
+// Layers Component
 export default function layersComponent() {
     return {
         items: [],
         selectedLayerId: null,
 
-        // Initialize layers from canvas objects
-        initLayers() {
+        init() {
+            // Initialize the layers component
+            this.syncLayers();
+
+            // Listen for canvas events
+            if (window.canvas) {
+                window.canvas.on("object:added", () => this.syncLayers());
+                window.canvas.on("object:removed", () => this.syncLayers());
+                window.canvas.on("selection:created", (e) => this.handleSelectionCreated(e));
+                window.canvas.on("selection:updated", (e) => this.handleSelectionCreated(e));
+                window.canvas.on("selection:cleared", () => this.handleSelectionCleared());
+            }
+        },
+
+        // Sync layers with canvas objects
+        syncLayers() {
             if (!window.canvas) return;
 
-            // Clear existing layers
-            this.items = [];
-
-            // Get all objects from canvas
+            // Get all objects from the canvas
             const objects = window.canvas.getObjects();
 
-            // Create layer items from canvas objects
-            objects.forEach((obj, index) => {
-                if (!obj.id) {
-                    obj.id = `layer_${Date.now()}_${index}`;
+            // Map canvas objects to layer items
+            this.items = objects.map((obj, index) => {
+                // Determine layer name based on object type
+                let name = `Layer ${index + 1}`;
+
+                if (obj.type === 'textbox') {
+                    name = `Text: ${obj.text.substring(0, 15)}${obj.text.length > 15 ? '...' : ''}`;
+                } else if (obj.type === 'image') {
+                    name = `Image ${index + 1}`;
+                } else if (obj.type === 'rect') {
+                    name = `Shape ${index + 1}`;
+                } else if (obj.type === 'path') {
+                    name = `Drawing ${index + 1}`;
+                } else if (obj.type === 'group') {
+                    name = `Group ${index + 1}`;
                 }
 
-                this.items.push({
-                    id: obj.id,
-                    name: obj.name || `Layer ${index + 1}`,
-                    type: obj.type || 'object',
-                    visible: obj.visible !== false,
-                    locked: obj.locked || false,
+                // Create layer object
+                return {
+                    id: obj.id || this.generateId(),
+                    name: obj.name || name,
+                    type: obj.type,
+                    visible: !obj.hidden,
                     object: obj
-                });
+                };
             });
 
-            // Reverse array to match canvas stacking order (top item is last in canvas objects)
+            // Sort layers to match canvas rendering order (bottom to top)
             this.items.reverse();
         },
 
+        // Generate unique ID for layer
+        generateId() {
+            return 'layer_' + Math.random().toString(36).substr(2, 9);
+        },
+
+        // Handle selection created
+        handleSelectionCreated(e) {
+            const activeObject = window.canvas.getActiveObject();
+            if (activeObject) {
+                // Find the layer ID for the selected object
+                const layer = this.items.find(item => item.object === activeObject);
+                if (layer) {
+                    this.selectedLayerId = layer.id;
+                }
+            }
+        },
+
+        // Handle selection cleared
+        handleSelectionCleared() {
+            this.selectedLayerId = null;
+        },
+
+        // Select a layer
         selectLayer(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Select the object on the canvas
+            window.canvas.setActiveObject(layer.object);
+            window.canvas.requestRenderAll();
+
+            // Update selected layer ID
             this.selectedLayerId = layer.id;
-            if (window.canvas) {
-                const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-                if (obj) {
-                    window.canvas.setActiveObject(obj);
-                    window.canvas.requestRenderAll();
-
-                    // Dispatch an event to notify other components
-                    window.dispatchEvent(new CustomEvent('layer:selected', {
-                        detail: {layer, object: obj}
-                    }));
-                }
-            }
         },
 
+        // Toggle layer visibility
         toggleLayerVisibility(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Toggle visibility
             layer.visible = !layer.visible;
-            if (window.canvas) {
-                const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-                if (obj) {
-                    obj.visible = layer.visible;
-                    window.canvas.requestRenderAll();
+            layer.object.visible = layer.visible;
 
-                    // Add to history
-                    if (typeof addToHistory === 'function') {
-                        addToHistory();
-                    }
-                }
+            // Update object hidden property (inverse of visible)
+            layer.object.set('hidden', !layer.visible);
+
+            // Render canvas
+            window.canvas.requestRenderAll();
+
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
             }
         },
 
-        toggleLayerLock(layer) {
-            layer.locked = !layer.locked;
-            if (window.canvas) {
-                const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-                if (obj) {
-                    // In Fabric.js v6, use selectable and evented properties
-                    obj.selectable = !layer.locked;
-                    obj.evented = !layer.locked;
-
-                    // Store the locked state
-                    obj.locked = layer.locked;
-
-                    window.canvas.requestRenderAll();
-
-                    // Add to history
-                    if (typeof addToHistory === 'function') {
-                        addToHistory();
-                    }
-                }
-            }
-        },
-
+        // Move layer up (increase z-index)
         moveLayerUp(index) {
-            if (index === 0) return;
+            if (!window.canvas || index <= 0 || index >= this.items.length) return;
 
-            // Swap layers in the array
-            const temp = this.items[index];
-            this.items[index] = this.items[index - 1];
-            this.items[index - 1] = temp;
+            // Get objects from canvas
+            const objects = window.canvas.getObjects();
 
-            // Reorder objects on canvas if available
-            if (window.canvas) {
-                const objects = window.canvas.getObjects();
-                const layerId1 = this.items[index].id;
-                const layerId2 = this.items[index - 1].id;
+            // Convert layer index to canvas index (they're inverted)
+            const canvasIndex = objects.length - 1 - index;
 
-                const obj1Index = objects.findIndex(o => o.id === layerId1);
-                const obj2Index = objects.findIndex(o => o.id === layerId2);
+            // Get object from canvas
+            const obj = objects[canvasIndex];
+            if (!obj) return;
 
-                if (obj1Index >= 0 && obj2Index >= 0) {
-                    // In Fabric.js v6, we can use moveUp to change the stacking order
-                    const obj1 = objects[obj1Index];
-                    const obj2 = objects[obj2Index];
+            // Get the object above
+            const targetIndex = canvasIndex + 1;
+            if (targetIndex >= objects.length) return;
 
-                    // This brings obj1 in front of obj2
-                    if (obj1Index < obj2Index) {
-                        window.canvas.bringObjectForward(obj1);
-                    } else {
-                        window.canvas.sendObjectBackward(obj2);
-                    }
+            // Custom implementation of bring forward
+            const newIndex = window.canvas._objects.indexOf(obj);
+            if (newIndex < window.canvas._objects.length - 1) {
+                // Remove object from current position
+                window.canvas._objects.splice(newIndex, 1);
+                // Insert object at new position
+                window.canvas._objects.splice(newIndex + 1, 0, obj);
+                window.canvas.requestRenderAll();
+            }
 
-                    window.canvas.requestRenderAll();
+            // Re-sync layers
+            this.syncLayers();
 
-                    // Add to history
-                    if (typeof addToHistory === 'function') {
-                        addToHistory();
-                    }
-                }
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
             }
         },
 
+        // Move layer down (decrease z-index)
         moveLayerDown(index) {
-            if (index >= this.items.length - 1) return;
+            if (!window.canvas || index < 0 || index >= this.items.length - 1) return;
 
-            // Swap layers in the array
-            const temp = this.items[index];
-            this.items[index] = this.items[index + 1];
-            this.items[index + 1] = temp;
+            // Get objects from canvas
+            const objects = window.canvas.getObjects();
 
-            // Reorder objects on canvas
-            if (window.canvas) {
-                const objects = window.canvas.getObjects();
-                const layerId1 = this.items[index].id;
-                const layerId2 = this.items[index + 1].id;
+            // Convert layer index to canvas index (they're inverted)
+            const canvasIndex = objects.length - 1 - index;
 
-                const obj1Index = objects.findIndex(o => o.id === layerId1);
-                const obj2Index = objects.findIndex(o => o.id === layerId2);
+            // Get object from canvas
+            const obj = objects[canvasIndex];
+            if (!obj) return;
 
-                if (obj1Index >= 0 && obj2Index >= 0) {
-                    // In Fabric.js v6, we can use moveDown to change the stacking order
-                    const obj1 = objects[obj1Index];
-                    const obj2 = objects[obj2Index];
+            // Custom implementation of send backwards
+            const newIndex = window.canvas._objects.indexOf(obj);
+            if (newIndex > 0) {
+                // Remove object from current position
+                window.canvas._objects.splice(newIndex, 1);
+                // Insert object at new position
+                window.canvas._objects.splice(newIndex - 1, 0, obj);
+                window.canvas.requestRenderAll();
+            }
 
-                    // This brings obj2 in front of obj1
-                    if (obj1Index > obj2Index) {
-                        window.canvas.bringObjectForward(obj2);
-                    } else {
-                        window.canvas.sendObjectBackward(obj1);
-                    }
+            // Re-sync layers
+            this.syncLayers();
 
-                    window.canvas.requestRenderAll();
-
-                    // Add to history
-                    if (typeof addToHistory === 'function') {
-                        addToHistory();
-                    }
-                }
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
             }
         },
 
+        // Delete layer
         deleteLayer(layer) {
-            const index = this.items.findIndex(l => l.id === layer.id);
-            if (index >= 0) {
-                this.items.splice(index, 1);
+            if (!window.canvas || !layer || !layer.object) return;
 
-                if (window.canvas) {
-                    const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-                    if (obj) {
-                        window.canvas.remove(obj);
-                        window.canvas.requestRenderAll();
+            // Remove object from canvas
+            window.canvas.remove(layer.object);
 
-                        // Add to history
-                        if (typeof addToHistory === 'function') {
-                            addToHistory();
-                        }
-
-                        // Clear selected layer if it was deleted
-                        if (this.selectedLayerId === layer.id) {
-                            this.selectedLayerId = null;
-                        }
-                    }
-                }
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
             }
         },
 
-        // Add new methods for additional functionality
-        addLayer(type) {
+        // Bring layer to front (top of stack)
+        bringToFront(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Custom implementation of bring to front
+            // Remove object from current position
+            const obj = layer.object;
+            const index = window.canvas._objects.indexOf(obj);
+            if (index !== -1) {
+                window.canvas._objects.splice(index, 1);
+                // Add to end of array (top of stack)
+                window.canvas._objects.push(obj);
+                window.canvas.requestRenderAll();
+            }
+
+            // Re-sync layers
+            this.syncLayers();
+
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
+            }
+        },
+
+        // Send layer to back (bottom of stack)
+        sendToBack(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Custom implementation of send to back
+            // Remove object from current position
+            const obj = layer.object;
+            const index = window.canvas._objects.indexOf(obj);
+            if (index !== -1) {
+                window.canvas._objects.splice(index, 1);
+                // Add to beginning of array (bottom of stack)
+                window.canvas._objects.unshift(obj);
+                window.canvas.requestRenderAll();
+            }
+
+            // Re-sync layers
+            this.syncLayers();
+
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
+            }
+        },
+
+        // Duplicate layer
+        duplicateLayer(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Clone the object
+            layer.object.clone((cloned) => {
+                // Position slightly offset from original
+                cloned.set({
+                    left: layer.object.left + 10,
+                    top: layer.object.top + 10
+                });
+
+                // Add to canvas
+                window.canvas.add(cloned);
+                window.canvas.setActiveObject(cloned);
+                window.canvas.requestRenderAll();
+
+                // If this is a component of fabricComponent, add to history
+                if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
+                }
+            });
+        },
+
+        // Lock layer
+        toggleLayerLock(layer) {
+            if (!window.canvas || !layer || !layer.object) return;
+
+            // Toggle lock state
+            const isLocked = layer.object.lockMovementX && layer.object.lockMovementY;
+            layer.object.set({
+                lockMovementX: !isLocked,
+                lockMovementY: !isLocked,
+                lockRotation: !isLocked,
+                lockScalingX: !isLocked,
+                lockScalingY: !isLocked,
+                selectable: isLocked
+            });
+
+            // Update layer
+            layer.locked = !isLocked;
+
+            // Render canvas
+            window.canvas.requestRenderAll();
+
+            // If this is a component of fabricComponent, add to history
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
+            }
+        },
+
+        // Add new layer
+        addNewLayer(type = 'rect', options = {}) {
             if (!window.canvas) return;
 
             let newObject;
-            const center = window.canvas.getCenter();
+            const canvasWidth = window.canvas.width;
+            const canvasHeight = window.canvas.height;
 
+            // Create object based on type
             switch (type) {
                 case 'rect':
-                    newObject = new Rect({
-                        left: center.left - 50,
-                        top: center.top - 50,
+                    newObject = new fabric.Rect({
+                        left: canvasWidth / 2,
+                        top: canvasHeight / 2,
                         width: 100,
                         height: 100,
-                        fill: '#' + Math.floor(Math.random() * 16777215).toString(16), // Random color
+                        fill: options.fill || '#cccccc',
                         originX: 'center',
                         originY: 'center',
+                        ...options
                     });
                     break;
 
                 case 'circle':
-                    newObject = new Circle({
-                        left: center.left,
-                        top: center.top,
+                    newObject = new fabric.Circle({
+                        left: canvasWidth / 2,
+                        top: canvasHeight / 2,
                         radius: 50,
-                        fill: '#' + Math.floor(Math.random() * 16777215).toString(16), // Random color
+                        fill: options.fill || '#cccccc',
                         originX: 'center',
                         originY: 'center',
+                        ...options
                     });
                     break;
 
                 case 'text':
-                    newObject = new Textbox('New Text Layer', {
-                        left: center.left,
-                        top: center.top,
-                        width: 200,
-                        fontSize: 20,
-                        fontFamily: 'Arial',
-                        fill: '#333333',
+                    newObject = new fabric.Textbox(options.text || 'New Text', {
+                        left: canvasWidth / 2,
+                        top: canvasHeight / 2,
+                        fontSize: options.fontSize || 30,
+                        fontFamily: options.fontFamily || 'Arial',
+                        fill: options.fill || '#000000',
+                        textAlign: 'center',
                         originX: 'center',
                         originY: 'center',
+                        width: 200,
+                        ...options
                     });
                     break;
-
-                default:
-                    return; // Exit if invalid type
             }
 
-            // Generate a unique ID for the new layer
-            const id = `layer_${Date.now()}_${this.items.length}`;
-            newObject.id = id;
-            newObject.name = `${type.charAt(0).toUpperCase() + type.slice(1)} Layer ${this.items.length + 1}`;
-
-            // Add object to canvas
-            window.canvas.add(newObject);
-            window.canvas.setActiveObject(newObject);
-            window.canvas.requestRenderAll();
-
-            // Add to layers panel
-            this.items.unshift({
-                id: id,
-                name: newObject.name,
-                type: type,
-                visible: true,
-                locked: false,
-                object: newObject,
-            });
-
-            // Select the new layer
-            this.selectedLayerId = id;
-
-            // Add to history
-            if (typeof addToHistory === 'function') {
-                addToHistory();
-            }
-        },
-
-        duplicateLayer(layer) {
-            if (!window.canvas) return;
-
-            const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-            if (!obj) return;
-
-            // Clone the object
-            obj.clone((clonedObj) => {
-                // Offset the clone slightly
-                clonedObj.set({
-                    left: obj.left + 10,
-                    top: obj.top + 10,
-                });
-
-                // Generate a unique ID for the cloned layer
-                const id = `layer_${Date.now()}_${this.items.length}`;
-                clonedObj.id = id;
-                clonedObj.name = `${layer.name} Copy`;
-
-                // Add cloned object to canvas
-                window.canvas.add(clonedObj);
-                window.canvas.setActiveObject(clonedObj);
+            if (newObject) {
+                // Add object to canvas
+                window.canvas.add(newObject);
+                window.canvas.setActiveObject(newObject);
                 window.canvas.requestRenderAll();
 
-                // Add to layers panel at the top of the stack
-                this.items.unshift({
-                    id: id,
-                    name: clonedObj.name,
-                    type: layer.type,
-                    visible: true,
-                    locked: false,
-                    object: clonedObj
-                });
-
-                // Select the new layer
-                this.selectedLayerId = id;
-
-                // Add to history
-                if (typeof addToHistory === 'function') {
-                    addToHistory();
-                }
-            });
-        },
-
-        renameLayer(layer, newName) {
-            const index = this.items.findIndex(l => l.id === layer.id);
-            if (index >= 0) {
-                this.items[index].name = newName;
-
-                // Update the name on the object as well
-                if (window.canvas) {
-                    const obj = window.canvas.getObjects().find(o => o.id === layer.id);
-                    if (obj) {
-                        obj.name = newName;
-                    }
+                // If this is a component of fabricComponent, add to history
+                if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
                 }
             }
         },
 
-        // Method to sync layers with canvas when objects are added/removed externally
-        syncLayers() {
-            if (!window.canvas) return;
+        // Rename layer
+        renameLayer(layer, newName) {
+            if (!layer) return;
 
-            // Get current canvas objects
-            const objects = window.canvas.getObjects();
+            // Update layer name
+            layer.name = newName;
 
-            // First remove layers that no longer exist in the canvas
-            this.items = this.items.filter(layer => {
-                return objects.some(obj => obj.id === layer.id);
-            });
+            // If object has a name property, update it too
+            if (layer.object) {
+                layer.object.name = newName;
+            }
+        },
 
-            // Then add any new objects to layers
-            objects.forEach((obj, index) => {
-                // Generate ID if it doesn't exist
-                if (!obj.id) {
-                    obj.id = `layer_${Date.now()}_${index}`;
-                }
-
-                // Check if this object is already in our layers
-                const existingLayer = this.items.find(layer => layer.id === obj.id);
-
-                if (!existingLayer) {
-                    // Add new layer to the beginning (top) of the array
-                    this.items.unshift({
-                        id: obj.id,
-                        name: obj.name || `Layer ${this.items.length + 1}`,
-                        type: obj.type || 'object',
-                        visible: obj.visible !== false,
-                        locked: obj.locked || false,
-                        object: obj
-                    });
-                } else {
-                    // Update existing layer properties
-                    existingLayer.visible = obj.visible !== false;
-                    existingLayer.locked = obj.locked || false;
-                    existingLayer.object = obj;
-                }
-            });
-
-            // Reorder layers to match canvas stacking order
-            const orderedLayers = [];
-            objects.slice().reverse().forEach(obj => {
-                const layer = this.items.find(l => l.id === obj.id);
-                if (layer) {
-                    orderedLayers.push(layer);
-                }
-            });
-
-            // Replace items with ordered layers
-            this.items = orderedLayers;
+        // Get layer by object
+        getLayerByObject(obj) {
+            if (!obj) return null;
+            return this.items.find(layer => layer.object === obj);
         }
-    }
+    };
 }

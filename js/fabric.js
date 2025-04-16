@@ -42,19 +42,6 @@ export default function fabricComponent() {
         settings: settingsComponent(),
         toolbar: toolbarComponent(),
 
-        // Include utility functions directly in the Alpine state
-        centerAll() {
-            if (!window.canvas) return;
-            const objects = window.canvas.getObjects();
-            if (objects.length === 0) return;
-
-            const selection = new ActiveSelection(objects, {canvas: window.canvas});
-            selection.center();
-            window.canvas.discardActiveObject();
-            this.addToHistory();
-            window.canvas.requestRenderAll();
-        },
-
         fitToCanvas() {
             if (!window.canvas) return;
             const objects = window.canvas.getObjects();
@@ -304,14 +291,17 @@ export default function fabricComponent() {
             this.$nextTick(() => {
                 this.initCanvas();
                 this.initHistoryManager();
-
+                this.initKeyboardShortcuts();
                 // Initialize context menu
                 if (this.contextMenu && typeof this.contextMenu.init === 'function') {
                     this.contextMenu.init();
                 }
-// Initialize masks component
+                   // Initialize masks component
                 if (this.masks && typeof this.masks.init === 'function') {
                     this.masks.init();
+                }
+                if (this.layers && typeof this.layers.init === 'function') {
+                    this.layers.init();
                 }
                 // Initialize other components as needed
                 if (this.uploads && typeof this.uploads.init === 'function') {
@@ -382,7 +372,9 @@ export default function fabricComponent() {
                     const objects = canvas.getObjects();
                     if (objects.length > 0) {
                         const selection = new ActiveSelection(objects, {canvas: canvas});
-                        selection.center();
+                        // Use centerH and centerV instead of center
+                        selection.centerH();
+                        selection.centerV();
                         canvas.discardActiveObject();
                         canvas.requestRenderAll();
                     }
@@ -420,6 +412,7 @@ export default function fabricComponent() {
 
                 // Ensure canvas is properly centered initially
                 setTimeout(() => {
+                    // Use the fixed centerAll method
                     this.centerAll();
                     canvas.requestRenderAll();
                 }, 100);
@@ -427,7 +420,6 @@ export default function fabricComponent() {
                 console.error("Error initializing canvas:", error);
             }
         },
-
         handleSelection(e) {
             try {
                 const activeObject = this.canvas.getActiveObject();
@@ -671,5 +663,260 @@ export default function fabricComponent() {
                 this.text.textAdded(textbox);
             }
         },
+
+        //  keyboard shortcuts
+        initKeyboardShortcuts() {
+            // Add event listener for keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Skip if we're in an input field or textarea
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                // Skip if any modifier keys are pressed except for the ones we explicitly check for
+                if (e.altKey) {
+                    return;
+                }
+
+                // Get active canvas object
+                const activeObject = window.canvas?.getActiveObject();
+
+                // Delete / Backspace key
+                if ((e.key === 'Delete' || e.key === 'Backspace') && activeObject) {
+                    e.preventDefault();
+                    this.deleteObject();
+                    window.canvas.requestRenderAll();
+                }
+
+                // Ctrl+C (Copy)
+                if (e.ctrlKey && e.key === 'c' && activeObject) {
+                    e.preventDefault();
+                    // Store object data as JSON
+                    window._clipboard = {
+                        type: activeObject.type,
+                        json: activeObject.toJSON(['src', 'crossOrigin']),
+                    };
+                }
+
+                // Ctrl+X (Cut)
+                if (e.ctrlKey && e.key === 'x' && activeObject) {
+                    e.preventDefault();
+                    // Store object data as JSON
+                    window._clipboard = {
+                        type: activeObject.type,
+                        json: activeObject.toJSON(['src', 'crossOrigin']),
+                    };
+                    this.deleteObject();
+                    window.canvas.requestRenderAll();
+                }
+
+                // Ctrl+V (Paste)
+                if (e.ctrlKey && e.key === 'v' && window._clipboard) {
+                    e.preventDefault();
+
+                    // Handle different object types appropriately
+                    if (window._clipboard.type === 'textbox') {
+                        // For textboxes, create a new textbox instead of cloning
+                        const textData = window._clipboard.json;
+                        const newTextbox = new Textbox(textData.text, {
+                            left: textData.left + 10,
+                            top: textData.top + 10,
+                            width: textData.width,
+                            fontSize: textData.fontSize,
+                            fontFamily: textData.fontFamily,
+                            fill: textData.fill,
+                            textAlign: textData.textAlign,
+                            fontWeight: textData.fontWeight,
+                            fontStyle: textData.fontStyle,
+                            underline: textData.underline,
+                            linethrough: textData.linethrough,
+                            charSpacing: textData.charSpacing,
+                            lineHeight: textData.lineHeight,
+                            stroke: textData.stroke,
+                            strokeWidth: textData.strokeWidth,
+                            backgroundColor: textData.backgroundColor,
+                            originX: textData.originX,
+                            originY: textData.originY
+                        });
+                        window.canvas.add(newTextbox);
+                        window.canvas.setActiveObject(newTextbox);
+                        window.canvas.requestRenderAll();
+                        this.addToHistory();
+
+                        // Update text component if available
+                        if (this.text && typeof this.text.textAdded === 'function') {
+                            this.text.textAdded(newTextbox);
+                        }
+                    }
+                    else if (window._clipboard.type === 'image') {
+                        // Special handling for images - recreate from source instead of cloning
+                        const imgData = window._clipboard.json;
+
+                        if (imgData.src) {
+                            // Create a completely new image from the source URL
+                            FabricImage.fromURL(imgData.src, (img) => {
+                                // Apply all the original properties
+                                img.set({
+                                    left: imgData.left + 10,
+                                    top: imgData.top + 10,
+                                    scaleX: imgData.scaleX,
+                                    scaleY: imgData.scaleY,
+                                    angle: imgData.angle,
+                                    flipX: imgData.flipX,
+                                    flipY: imgData.flipY,
+                                    originX: imgData.originX || 'center',
+                                    originY: imgData.originY || 'center',
+                                    opacity: imgData.opacity,
+                                    skewX: imgData.skewX,
+                                    skewY: imgData.skewY,
+                                    cropX: imgData.cropX,
+                                    cropY: imgData.cropY
+                                });
+
+                                // Apply filters if any
+                                if (imgData.filters && imgData.filters.length > 0) {
+                                    // Recreate filters
+                                    const newFilters = [];
+
+                                    for (const filterData of imgData.filters) {
+                                        if (!filterData) continue;
+
+                                        // Create filters based on their class name
+                                        switch (filterData.type) {
+                                            case 'Grayscale':
+                                                newFilters.push(new filters.Grayscale());
+                                                break;
+                                            case 'Sepia':
+                                                newFilters.push(new filters.Sepia());
+                                                break;
+                                            case 'Invert':
+                                                newFilters.push(new filters.Invert());
+                                                break;
+                                            case 'Blur':
+                                                newFilters.push(new filters.Blur({blur: filterData.blur || 0.5}));
+                                                break;
+                                            case 'Brightness':
+                                                newFilters.push(new filters.Brightness({brightness: filterData.brightness || 0.1}));
+                                                break;
+                                            case 'Contrast':
+                                                newFilters.push(new filters.Contrast({contrast: filterData.contrast || 0.25}));
+                                                break;
+                                            case 'Saturation':
+                                                newFilters.push(new filters.Saturation({saturation: filterData.saturation || 0.3}));
+                                                break;
+                                            case 'Noise':
+                                                newFilters.push(new filters.Noise({noise: filterData.noise || 100}));
+                                                break;
+                                            case 'Pixelate':
+                                                newFilters.push(new filters.Pixelate({blocksize: filterData.blocksize || 10}));
+                                                break;
+                                        }
+                                    }
+
+                                    // Apply the recreated filters
+                                    if (newFilters.length > 0) {
+                                        img.filters = newFilters;
+                                        img.applyFilters();
+                                    }
+                                }
+
+                                // Add to canvas
+                                window.canvas.add(img);
+                                window.canvas.setActiveObject(img);
+                                window.canvas.requestRenderAll();
+                                this.addToHistory();
+
+                                // Update uploads component if available
+                                if (this.uploads && typeof this.uploads.imageAdded === 'function') {
+                                    this.uploads.imageAdded(img);
+                                }
+                            }, {crossOrigin: 'anonymous'});
+                        }
+                    }
+                    else {
+                        // For other objects, use the standard fabric util to recreate from JSON
+                        // This avoids using the problematic clone method
+                        window.fabric.util.enlivenObjects([window._clipboard.json], (objects) => {
+                            const cloned = objects[0];
+                            cloned.set({
+                                left: window._clipboard.json.left + 10,
+                                top: window._clipboard.json.top + 10
+                            });
+                            window.canvas.add(cloned);
+                            window.canvas.setActiveObject(cloned);
+                            window.canvas.requestRenderAll();
+                            this.addToHistory();
+                        });
+                    }
+                }
+
+                // Escape (Deselect)
+                if (e.key === 'Escape') {
+                    window.canvas.discardActiveObject();
+                    window.canvas.requestRenderAll();
+                }
+            });
+        },
+
+        // Override the centerAll method in your fabricComponent.js file
+        centerAll() {
+            console.log("Running fixed centerAll function");
+            if (!window.canvas) return;
+            const objects = window.canvas.getObjects();
+            if (objects.length === 0) return;
+
+            try {
+                // Don't use ActiveSelection which is causing the centerH error
+                // Instead, calculate and apply offsets manually for each object
+
+                // Find the bounding box of all objects
+                let minX = Number.MAX_VALUE;
+                let minY = Number.MAX_VALUE;
+                let maxX = Number.MIN_VALUE;
+                let maxY = Number.MIN_VALUE;
+
+                objects.forEach(obj => {
+                    const boundingRect = obj.getBoundingRect();
+                    minX = Math.min(minX, boundingRect.left);
+                    minY = Math.min(minY, boundingRect.top);
+                    maxX = Math.max(maxX, boundingRect.left + boundingRect.width);
+                    maxY = Math.max(maxY, boundingRect.top + boundingRect.height);
+                });
+
+                // Calculate the current center of all objects
+                const currentCenterX = (minX + maxX) / 2;
+                const currentCenterY = (minY + maxY) / 2;
+
+                // Calculate the canvas center
+                const canvasCenterX = window.canvas.width / 2;
+                const canvasCenterY = window.canvas.height / 2;
+
+                // Calculate the offset needed to center the objects
+                const offsetX = canvasCenterX - currentCenterX;
+                const offsetY = canvasCenterY - currentCenterY;
+
+                // Apply offset to each object
+                objects.forEach(obj => {
+                    obj.set({
+                        left: obj.left + offsetX,
+                        top: obj.top + offsetY
+                    });
+                    obj.setCoords();
+                });
+
+                // Update canvas
+                window.canvas.requestRenderAll();
+
+                if (typeof this.addToHistory === 'function') {
+                    this.addToHistory();
+                }
+
+                console.log("Objects centered successfully");
+            } catch (error) {
+                console.error("Error in centerAll:", error);
+            }
+        }
+
+
     };
 }
