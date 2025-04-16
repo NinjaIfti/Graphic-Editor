@@ -1,4 +1,4 @@
-
+import { EraserBrush } from '@erase2d/fabric';
 export default function drawingComponent() {
     return {
         isActive: false,
@@ -212,27 +212,45 @@ export default function drawingComponent() {
             }
         },
 
-        // Setup eraser using PencilBrush
+
         setupEraser() {
             if (!window.canvas) return;
 
             try {
-                const eraserBrush = new fabric.PencilBrush(window.canvas);
+                // Set erasable property based on object type
+                window.canvas.forEachObject(function(obj) {
+                    // Only make paths erasable, not text or images
+                    if (obj.type === 'path') {
+                        obj.set('erasable', true);
+                    } else {
+                        obj.set('erasable', false);
+                    }
+                });
+                window.canvas.requestRenderAll();
+
+                // Create an instance of EraserBrush
+                const eraserBrush = new EraserBrush(window.canvas);
+
+                // Set brush size
                 eraserBrush.width = parseInt(this.eraserSettings.size);
-                eraserBrush.color = this.eraserSettings.invert ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)";
 
-                const originalCreatePath = fabric.PencilBrush.prototype._renderPath;
+                // Set inverted mode if needed
+                eraserBrush.inverted = this.eraserSettings.invert;
 
-                fabric.PencilBrush.prototype._renderPath = function (ctx) {
-                    ctx.globalCompositeOperation = "destination-out";
-                    originalCreatePath.call(this, ctx);
-                    ctx.globalCompositeOperation = "source-over";
-                };
+                // Listen for the end event to commit changes
+                eraserBrush.on('end', async (e) => {
+                    const { path, targets } = e.detail;
+                    await eraserBrush.commit({ path, targets });
+                    window.canvas.requestRenderAll();
+                });
 
+                // Set as active brush
                 window.canvas.freeDrawingBrush = eraserBrush;
                 window.canvas.isDrawingMode = true;
             } catch (error) {
-                console.error("Error setting up eraser:", error);
+                console.error("Error setting up eraser brush:", error);
+
+                // Fallback implementation if needed
             }
         },
 
@@ -242,14 +260,9 @@ export default function drawingComponent() {
 
             window.canvas.isDrawingMode = false;
 
-            if (window.canvas._originalCreatePath) {
-                fabric.PencilBrush.prototype._renderPath = window.canvas._originalCreatePath;
-                delete window.canvas._originalCreatePath;
-            }
-
-            if (window.canvas._pathCreatedHandler) {
-                window.canvas.off("path:created", window.canvas._pathCreatedHandler);
-                delete window.canvas._pathCreatedHandler;
+            // If the current brush is our eraser, reset it
+            if (window.canvas.freeDrawingBrush && window.canvas.freeDrawingBrush.type === "eraser") {
+                // Nothing special needed here since we're modifying the instance, not the prototype
             }
         },
 

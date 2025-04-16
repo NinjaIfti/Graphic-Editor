@@ -19,7 +19,6 @@ import masksComponent from "./components/masks";
 import settingsComponent from "./components/settings";
 import toolbarComponent from "./components/toolbar";
 import contextMenuComponent from "./components/contextMenu";
-
 import {downloadJPG, downloadPNG} from "./utils/export-utils";
 
 // Create the unified fabric component
@@ -345,20 +344,49 @@ export default function fabricComponent() {
 
         initCanvas() {
             try {
+                // Get the canvas container element
+                const canvasContainer = document.getElementById('canvas-container');
+
+                // Set size to be square (same width and height)
+                const containerSize = Math.min(canvasContainer.clientWidth, canvasContainer.clientHeight);
+
+                // Create canvas with square dimensions
                 const canvas = new Canvas("image-editor", {
                     preserveObjectStacking: true,
-                    width: 1200,
-                    height: 600,
+                    width: containerSize,
+                    height: containerSize, // Make sure height equals width
                     backgroundColor: "#ffffff",
                     enableRetinaScaling: true,
                     renderOnAddRemove: false,
                 });
 
+                // Store canvas reference globally and in Alpine state
                 window.canvas = canvas;
                 this.canvas = canvas;
 
                 // Make this component accessible globally for child components
                 window.fabricComponent = this;
+
+                // Add proper resize handling to maintain square aspect ratio
+                window.addEventListener('resize', () => {
+                    // Get new container size (should be square)
+                    const newSize = Math.min(canvasContainer.clientWidth, canvasContainer.clientHeight);
+
+                    // Update canvas dimensions as a square
+                    canvas.setDimensions({
+                        width: newSize,
+                        height: newSize // Equal to width for square
+                    });
+
+                    // Re-center all objects
+                    const objects = canvas.getObjects();
+                    if (objects.length > 0) {
+                        const selection = new ActiveSelection(objects, {canvas: canvas});
+                        selection.center();
+                        canvas.discardActiveObject();
+                        canvas.requestRenderAll();
+                    }
+                });
 
                 // Make wheel event passive for better performance
                 if (canvas.wrapperEl) {
@@ -389,8 +417,14 @@ export default function fabricComponent() {
 
                 // Initial render
                 canvas.requestRenderAll();
+
+                // Ensure canvas is properly centered initially
+                setTimeout(() => {
+                    this.centerAll();
+                    canvas.requestRenderAll();
+                }, 100);
             } catch (error) {
-                // Silent error handling
+                console.error("Error initializing canvas:", error);
             }
         },
 

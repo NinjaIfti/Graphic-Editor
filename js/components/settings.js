@@ -32,20 +32,37 @@ export default function settingsComponent() {
         init() {
             this.filteredSizes = [...this.canvasSizes];
 
+            // Check if 'custom' is selected and show the custom size inputs
+            if (this.selectedValue === 'custom') {
+                this.customSizeVisible = true;
+            }
+
             // Apply default canvas size and background
             if (window.canvas) {
                 this.applyCanvasSize(this.selectedValue);
                 this.updateBackgroundColor();
             }
+
+            // For debugging - log initialization state
+            console.log('Settings initialized with:', {
+                selectedSize: this.selectedSize,
+                selectedValue: this.selectedValue,
+                customWidth: this.customWidth,
+                customHeight: this.customHeight,
+                customSizeVisible: this.customSizeVisible
+            });
         },
 
         selectSize(size) {
+            console.log('Size selected:', size);
             this.selectedSize = size.name;
             this.selectedValue = size.value;
             this.dropdownOpen = false;
 
             if (size.value === 'custom') {
                 this.customSizeVisible = true;
+                console.log('Custom size selected, showing inputs');
+                // Don't apply canvas size yet - wait for user to click Apply button
             } else {
                 this.customSizeVisible = false;
                 this.applyCanvasSize(size.value);
@@ -53,7 +70,11 @@ export default function settingsComponent() {
         },
 
         applyCanvasSize(size) {
-            if (!window.canvas) return;
+            console.log('Applying canvas size:', size);
+            if (!window.canvas) {
+                console.error('Canvas not found');
+                return;
+            }
 
             // Store old dimensions
             const oldWidth = window.canvas.width;
@@ -64,23 +85,57 @@ export default function settingsComponent() {
             if (size === 'custom') {
                 newWidth = parseInt(this.customWidth);
                 newHeight = parseInt(this.customHeight);
+                console.log('Using custom dimensions:', newWidth, 'x', newHeight);
             } else {
                 const [width, height] = size.split('x');
                 newWidth = parseInt(width);
                 newHeight = parseInt(height);
+                console.log('Using preset dimensions:', newWidth, 'x', newHeight);
             }
 
             // Don't proceed if dimensions are invalid
             if (isNaN(newWidth) || isNaN(newHeight) || newWidth <= 0 || newHeight <= 0) {
-                console.warn('Invalid canvas dimensions');
+                console.warn('Invalid canvas dimensions:', newWidth, 'x', newHeight);
                 return;
             }
 
-            // Set new dimensions
+            // Get container element
+            const container = document.getElementById('canvas-container');
+            if (!container) {
+                console.warn('Canvas container not found');
+                return;
+            }
+
+            // Update container style to match new dimensions
+            const aspectRatio = newHeight / newWidth;
+
+            // For small canvas sizes, we need to ensure the container shrinks appropriately
+            // Remove the previous fixed constraints and let the canvas determine the size
+            container.style.width = 'auto';
+            container.style.height = 'auto';
+
+            // Set the canvas container to exactly match the canvas dimensions
+            // This ensures no white space appears around the canvas
+            container.style.width = `${newWidth}px`;
+            container.style.height = `${newHeight}px`;
+            container.style.aspectRatio = `${newWidth} / ${newHeight}`;
+
+            // Remove any max-width constraints that might be causing white space
+            container.style.maxWidth = 'none';
+
+            console.log('Container style updated:', {
+                width: container.style.width,
+                height: container.style.height,
+                aspectRatio: container.style.aspectRatio
+            });
+
+            // Set new dimensions for the Fabric.js canvas
             window.canvas.setDimensions({
                 width: newWidth,
                 height: newHeight
             });
+
+            console.log('Canvas dimensions set to:', newWidth, 'x', newHeight);
 
             // Scale factor for objects if needed
             const scaleX = newWidth / oldWidth;
@@ -105,6 +160,7 @@ export default function settingsComponent() {
 
                     obj.setCoords();
                 });
+                console.log('Objects scaled with factors:', scaleX, scaleY);
             }
 
             // Update canvas
@@ -117,10 +173,27 @@ export default function settingsComponent() {
         },
 
         applyCustomSize() {
-            if (!this.customWidth || !this.customHeight) return;
+            console.log('Applying custom size:', this.customWidth, 'x', this.customHeight);
 
-            this.selectedSize = `Custom (${this.customWidth}x${this.customHeight})`;
+            // Validation
+            if (!this.customWidth || !this.customHeight) {
+                console.warn('Custom dimensions missing');
+                return;
+            }
+
+            const width = parseInt(this.customWidth);
+            const height = parseInt(this.customHeight);
+
+            if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+                console.warn('Invalid custom dimensions');
+                return;
+            }
+
+            // Update selection display
+            this.selectedSize = `Custom (${width}x${height})`;
             this.selectedValue = 'custom';
+
+            // Apply the custom size
             this.applyCanvasSize('custom');
         },
 
@@ -259,6 +332,11 @@ export default function settingsComponent() {
                 this.customHeight = settings.canvasSize.height;
                 this.selectedSize = settings.canvasSize.selectedSize;
                 this.selectedValue = settings.canvasSize.selectedValue;
+
+                // Show custom size inputs if custom size is selected
+                if (this.selectedValue === 'custom') {
+                    this.customSizeVisible = true;
+                }
 
                 this.applyCanvasSize(this.selectedValue);
             }

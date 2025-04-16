@@ -64,16 +64,28 @@ export default function masksComponent() {
                     // Create a Fabric image from the loaded image
                     const mask = new FabricImage(img);
 
-                    // Get image dimensions
+                    // Get image dimensions - use width and height, not scaled values
+                    // This ensures we work with the actual image dimensions
                     const width = targetObject.getScaledWidth();
                     const height = targetObject.getScaledHeight();
 
-                    // Scale the mask to fit the image but maintain aspect ratio
-                    const scaleX = width / mask.width;
-                    const scaleY = height / mask.height;
-                    const scale = Math.min(scaleX, scaleY);
+                    // Determine which dimension to match (width or height)
+                    // Based on which would preserve the mask's aspect ratio best
+                    const maskAspectRatio = mask.width / mask.height;
+                    const imageAspectRatio = width / height;
 
-                    mask.scale(scale);
+                    let scaleToUse;
+
+                    if (maskAspectRatio > imageAspectRatio) {
+                        // If mask is wider than image (proportionally), scale to height
+                        scaleToUse = height / mask.height;
+                    } else {
+                        // If mask is taller than image (proportionally), scale to width
+                        scaleToUse = width / mask.width;
+                    }
+
+                    // Apply the calculated scale uniformly
+                    mask.scale(scaleToUse);
 
                     // Center the mask on the image
                     mask.set({
