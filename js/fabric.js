@@ -78,35 +78,155 @@ export default function fabricComponent() {
             const activeObject = window.canvas.getActiveObject();
             if (!activeObject) return;
 
+            // Case 1: Single object - align relative to canvas
+            if (activeObject.type !== 'activeSelection' && activeObject.type !== 'group') {
+                this.alignSingleObject(activeObject, direction);
+            }
+            // Case 2: Multiple objects - align relative to each other
+            else {
+                this.alignMultipleObjects(activeObject, direction);
+            }
+
+            window.canvas.requestRenderAll();
+            this.addToHistory();
+        },
+
+        // aligning a single object to the canvas
+        alignSingleObject(object, direction) {
             const canvasWidth = window.canvas.width;
             const canvasHeight = window.canvas.height;
-            const objectWidth = activeObject.width * activeObject.scaleX;
-            const objectHeight = activeObject.height * activeObject.scaleY;
+            const objectWidth = object.width * object.scaleX;
+            const objectHeight = object.height * object.scaleY;
 
             switch (direction) {
                 case "left":
-                    activeObject.set({left: objectWidth / 2});
+                    object.set({left: objectWidth / 2});
                     break;
                 case "horizontalCenter":
-                    activeObject.set({left: canvasWidth / 2});
+                case "centerH":
+                    object.set({left: canvasWidth / 2});
                     break;
                 case "right":
-                    activeObject.set({left: canvasWidth - objectWidth / 2});
+                    object.set({left: canvasWidth - objectWidth / 2});
                     break;
                 case "top":
-                    activeObject.set({top: objectHeight / 2});
+                    object.set({top: objectHeight / 2});
                     break;
                 case "verticalCenter":
-                    activeObject.set({top: canvasHeight / 2});
+                case "centerV":
+                    object.set({top: canvasHeight / 2});
                     break;
                 case "bottom":
-                    activeObject.set({top: canvasHeight - objectHeight / 2});
+                    object.set({top: canvasHeight - objectHeight / 2});
                     break;
             }
 
-            activeObject.setCoords();
-            window.canvas.requestRenderAll();
-            this.addToHistory();
+            object.setCoords();
+        },
+
+// aligning multiple objects relative to each other
+        alignMultipleObjects(activeSelection, direction) {
+            // Get all objects in the selection
+            const objects = activeSelection.getObjects();
+            if (objects.length <= 1) return; // Nothing to align if only one object
+
+            // Find the bounds of the selection
+            const selectionBounds = activeSelection.getBoundingRect(true);
+
+            switch (direction) {
+                case "left":
+                    // Align all objects to the leftmost point
+                    let minLeft = Infinity;
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        minLeft = Math.min(minLeft, boundingRect.left);
+                    });
+
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        const objWidth = boundingRect.width;
+                        obj.set({
+                            left: obj.left + (minLeft - boundingRect.left) + (objWidth / 2) - (obj.width * obj.scaleX / 2)
+                        });
+                    });
+                    break;
+
+                case "horizontalCenter":
+                case "centerH":
+                    // Align all objects to horizontal center of selection
+                    const selectionCenterX = selectionBounds.left + selectionBounds.width / 2;
+                    objects.forEach(obj => {
+                        obj.set({
+                            left: obj.left + (selectionCenterX - (obj.left + (obj.width * obj.scaleX / 2)))
+                        });
+                    });
+                    break;
+
+                case "right":
+                    // Align all objects to the rightmost point
+                    let maxRight = -Infinity;
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        maxRight = Math.max(maxRight, boundingRect.left + boundingRect.width);
+                    });
+
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        const objWidth = boundingRect.width;
+                        obj.set({
+                            left: obj.left + (maxRight - (boundingRect.left + boundingRect.width)) + (obj.width * obj.scaleX / 2) - (objWidth / 2)
+                        });
+                    });
+                    break;
+
+                case "top":
+                    // Align all objects to the topmost point
+                    let minTop = Infinity;
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        minTop = Math.min(minTop, boundingRect.top);
+                    });
+
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        const objHeight = boundingRect.height;
+                        obj.set({
+                            top: obj.top + (minTop - boundingRect.top) + (objHeight / 2) - (obj.height * obj.scaleY / 2)
+                        });
+                    });
+                    break;
+
+                case "verticalCenter":
+                case "centerV":
+                    // Align all objects to vertical center of selection
+                    const selectionCenterY = selectionBounds.top + selectionBounds.height / 2;
+                    objects.forEach(obj => {
+                        obj.set({
+                            top: obj.top + (selectionCenterY - (obj.top + (obj.height * obj.scaleY / 2)))
+                        });
+                    });
+                    break;
+
+                case "bottom":
+                    // Align all objects to the bottommost point
+                    let maxBottom = -Infinity;
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        maxBottom = Math.max(maxBottom, boundingRect.top + boundingRect.height);
+                    });
+
+                    objects.forEach(obj => {
+                        const boundingRect = obj.getBoundingRect(true);
+                        const objHeight = boundingRect.height;
+                        obj.set({
+                            top: obj.top + (maxBottom - (boundingRect.top + boundingRect.height)) + (obj.height * obj.scaleY / 2) - (objHeight / 2)
+                        });
+                    });
+                    break;
+            }
+
+            // Need to call this after modifying objects within a selection
+            activeSelection.setCoords();
         },
 
         group() {
@@ -424,7 +544,7 @@ export default function fabricComponent() {
             try {
                 const activeObject = this.canvas.getActiveObject();
                 if (activeObject) {
-                    console.log("Selection type:", activeObject.type);
+                    
 
                     // Update specific component states
                     if (this.toolbar) {
@@ -860,7 +980,7 @@ export default function fabricComponent() {
 
         // Override the centerAll method in your fabricComponent.js file
         centerAll() {
-            console.log("Running fixed centerAll function");
+            
             if (!window.canvas) return;
             const objects = window.canvas.getObjects();
             if (objects.length === 0) return;
