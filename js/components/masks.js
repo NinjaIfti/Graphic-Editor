@@ -1,4 +1,4 @@
-// src/components/masks.js - Improved version
+// src/components/masks.js - SVG Overlay Approach
 import { FabricImage } from "fabric";
 
 export default function masksComponent() {
@@ -7,6 +7,18 @@ export default function masksComponent() {
     maskItems: [],
     selectedMask: null,
     cachedImageObject: null, // Cache the selected image
+    svgMaskTemplates: {
+      // Basic circle mask
+      mask1: '<circle cx="50%" cy="50%" r="50%" fill="black" />',
+      // Arrow mask
+      mask2:
+        '<polygon points="50,0 100,50 75,50 75,100 25,100 25,50 0,50" fill="black" />',
+      // Triangle mask
+      mask3: '<polygon points="50,0 100,100 0,100" fill="black" />',
+      // Square mask with rounded corners
+      mask5:
+        '<rect x="0" y="0" width="100%" height="100%" rx="10" ry="10" fill="black" />',
+    },
 
     init() {
       this.loadMasks();
@@ -36,85 +48,115 @@ export default function masksComponent() {
     },
 
     applyMask(maskSrc) {
-      if (!window.canvas) return;
+      if (!window.canvas) {
+        console.log("Canvas not available");
+        return;
+      }
 
       // Try to get the active object, fall back to our cached image if needed
       let targetObject = window.canvas.getActiveObject();
+      console.log("Initial target object:", targetObject);
 
       // If no active object, use our cached image
       if (!targetObject && this.cachedImageObject) {
         targetObject = this.cachedImageObject;
         // Reselect it to make it the active object
         window.canvas.setActiveObject(targetObject);
+        console.log("Using cached image object:", this.cachedImageObject);
       }
 
       // Final check if we have a valid image
-      if (!targetObject || targetObject.type !== "image") return;
+      if (!targetObject || targetObject.type !== "image") {
+        console.log("No valid image target found");
+        return;
+      }
 
-      // Clear existing clipPath directly before loading the new mask
-      targetObject.clipPath = null;
-      window.canvas.requestRenderAll();
+      console.log("Target object found:", targetObject);
 
-      // Create an image element to load the mask
-      const img = new Image();
-      img.crossOrigin = "anonymous";
+      // Extract the mask ID from the path
+      // The paths are like './images/mask/1.svg', './images/mask/2.svg', etc.
+      const filename = maskSrc.split("/").pop();
+      const maskId = "mask" + filename.split(".")[0];
 
-      img.onload = () => {
-        try {
-          // Create a Fabric image from the loaded image
-          const mask = new FabricImage(img);
+      console.log("Looking for mask template with ID:", maskId);
+      const maskTemplate = this.svgMaskTemplates[maskId];
 
-          // Get target object dimensions
-          const imageWidth = targetObject.getScaledWidth();
-          const imageHeight = targetObject.getScaledHeight();
+      if (!maskTemplate) {
+        console.error("No SVG template found for mask ID:", maskId);
+        return;
+      }
 
-          // Calculate the width and height ratios
-          const widthRatio = imageWidth / mask.width;
-          const heightRatio = imageHeight / mask.height;
+      // Remove any existing mask
+      this.removeMask();
 
-          // Determine which dimension needs adjustment
-          // If widthRatio is smaller than heightRatio, the mask is wider relative to the image
-          // If heightRatio is smaller than widthRatio, the mask is taller relative to the image
-          let scaleX, scaleY;
+      // Get the image dimensions and position
+      const imageWidth = targetObject.getScaledWidth();
+      const imageHeight = targetObject.getScaledHeight();
+      const imageLeft = targetObject.left;
+      const imageTop = targetObject.top;
+      const imageAngle = targetObject.angle || 0;
 
-          if (widthRatio < heightRatio) {
-            // Mask is wider relative to image, so adjust based on width
-            scaleX = widthRatio;
-            scaleY = widthRatio; // Maintain aspect ratio
-          } else {
-            // Mask is taller relative to image, so adjust based on height
-            scaleX = heightRatio;
-            scaleY = heightRatio; // Maintain aspect ratio
-          }
+      console.log("Image dimensions:", imageWidth, "x", imageHeight);
+      console.log("Image position:", imageLeft, imageTop);
 
-          // Scale the mask uniformly
-          mask.scaleX = scaleX;
-          mask.scaleY = scaleY;
+      // Create the SVG with proper dimensions
+      const svgString = `
+                <svg xmlns="http://www.w3.org/2000/svg" 
+                     width="${imageWidth}" 
+                     height="${imageHeight}" 
+                     viewBox="0 0 ${imageWidth} ${imageHeight}">
+                    ${maskTemplate}
+                </svg>
+            `;
 
-          // Center the mask on the image
-          mask.set({
-            originX: "center",
-            originY: "center",
-            left: 0,
-            top: 0,
-            absolutePositioned: false,
-            inverted: false,
-          });
+      console.log("Generated SVG:", svgString);
 
-          // Apply the new clipPath
-          targetObject.clipPath = mask;
-
-          // Update canvas and save state
-          window.canvas.requestRenderAll();
-          window.fabricComponent.addToHistory();
-          this.selectedMask = maskSrc;
-        } catch (error) {
-          console.error("Error applying mask:", error);
+      // Create a fabric.js SVG object
+      fabric.loadSVGFromString(svgString, (objects, options) => {
+        if (!objects || objects.length === 0) {
+          console.error("Failed to load SVG from string");
+          return;
         }
-      };
 
-      // Start loading the image
-      img.src = maskSrc;
+        // Group SVG objects if there are multiple elements
+        const svgGroup =
+          objects.length > 1 ? new fabric.Group(objects) : objects[0];
+
+        // Size and position the SVG exactly over the image
+        svgGroup.set({
+          left: imageLeft,
+          top: imageTop,
+          width: imageWidth,
+          height: imageHeight,
+          angle: imageAngle,
+          originX: "center",
+          originY: "center",
+          clipPath: targetObject, // Use the image as a clip path for the SVG
+        });
+
+        console.log("SVG group created with properties:", svgGroup);
+
+        // Add the SVG to the canvas
+        window.canvas.add(svgGroup);
+
+        // Store the SVG for later removal
+        targetObject.maskOverlay = svgGroup;
+
+        // Update canvas
+        window.canvas.requestRenderAll();
+
+        // Save state if history function is available
+        if (
+          window.fabricComponent &&
+          typeof window.fabricComponent.addToHistory === "function"
+        ) {
+          window.fabricComponent.addToHistory();
+        }
+
+        // Update selected mask reference
+        this.selectedMask = maskSrc;
+        console.log("Mask application complete");
+      });
     },
 
     removeMask() {
@@ -130,14 +172,29 @@ export default function masksComponent() {
         window.canvas.setActiveObject(targetObject);
       }
 
-      if (!targetObject) return;
+      if (!targetObject) {
+        console.log("No object found to remove mask from");
+        return;
+      }
 
-      // Remove clipPath
-      targetObject.clipPath = null;
+      // Remove any existing mask overlay
+      if (targetObject.maskOverlay) {
+        window.canvas.remove(targetObject.maskOverlay);
+        targetObject.maskOverlay = null;
+        console.log("Mask overlay removed");
+      }
 
-      // Update canvas and save state
+      // Update canvas
       window.canvas.requestRenderAll();
-      window.fabricComponent.addToHistory();
+
+      // Save state if history function is available
+      if (
+        window.fabricComponent &&
+        typeof window.fabricComponent.addToHistory === "function"
+      ) {
+        window.fabricComponent.addToHistory();
+      }
+
       this.selectedMask = null;
     },
 
