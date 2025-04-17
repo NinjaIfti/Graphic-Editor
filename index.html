@@ -1530,7 +1530,9 @@
                             @input="text.updateTextCurve($event.target.value)"
                     />
                     <div class="w-full h-1 bg-[#ebebeb] rounded-lg"></div>
+                    <!-- Center line for visual reference -->
                     <div class="absolute top-[-0.5px] h-2 w-[1px] bg-black left-1/2 transform -translate-x-1/2"></div>
+                    <!-- Thumb -->
                     <div
                             class="absolute -top-3 w-5 h-5 bg-[#37495d] rounded-full"
                             :style="`left: calc(${text.curveValue / 5000 * 100}% - 10px); top: 2px;`"
@@ -1542,6 +1544,7 @@
                     <span>360°</span>
                   </div>
                 </div>
+
 
                 <!-- Font Family & Font Size -->
                 <div class="space-y-1">
@@ -1616,35 +1619,26 @@
                 </div>
 
                 <!-- Opacity -->
-                <div class="space-y-1">
+                <div class="space-y-2">
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium">Opacity</span>
                     <input
-                      type="number"
-                      class="w-12 bg-[#f8f9fa] rounded text-center px-2 py-1 text-sm border border-[#0001]"
-                      x-model="text.textProperties.opacity"
-                      readonly
+                            type="number"
+                            class="w-12 bg-[#f8f9fa] rounded text-center px-2 py-1 text-sm border border-[#0001]"
+                            x-model="text.textProperties.opacity"
+                            readonly
                     />
                   </div>
                   <div class="relative w-full">
                     <input
-                      type="range"
-                      class="w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10 opacity-0 absolute"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      x-model="text.textProperties.opacity"
-                      @input="text.updateTextProperty('opacity', $event.target.value)"
+                            type="range"
+                            class="opacity-slider w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            x-model="text.textProperties.opacity"
+                            @input="text.updateTextProperty('opacity', $event.target.value)"
                     />
-                    <div class="w-full h-1 bg-[#ebebeb] rounded-lg"></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#6b7280] rounded-full"
-                      :style="`left: calc(${text.textProperties.opacity * 100}% - 10px); top: 4px;`"
-                    ></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#37495d] rounded-full"
-                      :style="`left: calc(${text.textProperties.opacity * 100}% - 12px); top: 2px;`"
-                    ></div>
                   </div>
                 </div>
 
@@ -1653,43 +1647,32 @@
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium">Outline</span>
                     <div class="flex items-center space-x-2">
-                      <div
-                        class="w-6 h-6 rounded border border-[#0001] overflow-hidden"
-                      >
+                      <div class="w-6 h-6 rounded border border-[#0001] overflow-hidden">
                         <input
-                          type="color"
-                          class="w-8 h-8 transform -translate-x-1 -translate-y-1"
-                          x-model="text.textProperties.stroke"
-                          @input="text.updateTextProperty('stroke', $event.target.value)"
+                                type="color"
+                                class="w-8 h-8 transform -translate-x-1 -translate-y-1"
+                                x-model="text.textProperties.stroke"
+                                @input="text.updateTextProperty('stroke', $event.target.value)"
                         />
                       </div>
                       <input
-                        type="number"
-                        class="w-12 bg-[#f8f9fa] border border-[#0001] rounded text-center px-2 py-1 text-sm"
-                        x-model="text.textProperties.strokeWidth"
-                        readonly
+                              type="number"
+                              class="w-12 bg-[#f8f9fa] border border-[#0001] rounded text-center px-2 py-1 text-sm"
+                              x-model="text.textProperties.strokeWidth"
+                              readonly
                       />
                     </div>
                   </div>
                   <div class="relative w-full">
                     <input
-                      type="range"
-                      class="w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10 opacity-0 absolute"
-                      min="0"
-                      max="5"
-                      step="0.1"
-                      x-model="text.textProperties.strokeWidth"
-                      @input="text.updateTextProperty('strokeWidth', $event.target.value)"
+                            type="range"
+                            class="outline-slider w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10"
+                            min="0"
+                            max="5"
+                            step="0.1"
+                            x-model="text.textProperties.strokeWidth"
+                            @input="text.updateTextProperty('strokeWidth', $event.target.value)"
                     />
-                    <div class="w-full h-1 bg-[#ebebeb] rounded-lg"></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#6b7280] rounded-full"
-                      :style="`left: calc(${text.textProperties.strokeWidth / 5 * 100}% - 10px); top: 4px;`"
-                    ></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#37495d] rounded-full"
-                      :style="`left: calc(${text.textProperties.strokeWidth / 5 * 100}% - 12px); top: 2px;`"
-                    ></div>
                   </div>
                 </div>
 
@@ -1698,30 +1681,21 @@
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium">Letter Spacing</span>
                     <input
-                      type="number"
-                      class="w-12 bg-[#f8f9fa] border border-[#0001] rounded text-center px-2 py-1 text-sm"
-                      x-model="text.textProperties.charSpacing"
-                      readonly
+                            type="number"
+                            class="w-12 bg-[#f8f9fa] border border-[#0001] rounded text-center px-2 py-1 text-sm"
+                            x-model="text.textProperties.charSpacing"
+                            readonly
                     />
                   </div>
                   <div class="relative w-full">
                     <input
-                      type="range"
-                      class="w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10 opacity-0 absolute"
-                      min="0"
-                      max="500"
-                      x-model="text.textProperties.charSpacing"
-                      @input="text.updateTextProperty('charSpacing', $event.target.value)"
+                            type="range"
+                            class="letter-spacing-slider w-full h-1 bg-[#ebebeb] rounded-lg appearance-none cursor-pointer z-10"
+                            min="0"
+                            max="500"
+                            x-model="text.textProperties.charSpacing"
+                            @input="text.updateTextProperty('charSpacing', $event.target.value)"
                     />
-                    <div class="w-full h-1 bg-[#ebebeb] rounded-lg"></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#6b7280] rounded-full"
-                      :style="`left: calc(${text.textProperties.charSpacing / 500 * 100}% - 10px); top: 4px;`"
-                    ></div>
-                    <div
-                      class="absolute -top-3 w-5 h-5 bg-[#37495d] rounded-full"
-                      :style="`left: calc(${text.textProperties.charSpacing / 500 * 100}% - 12px); top: 2px;`"
-                    ></div>
                   </div>
                 </div>
 
@@ -2763,7 +2737,7 @@
         <div class="flex justify-center items-center w-full h-full relative">
           <!-- Quick Options Bar -->
           <div
-                  class="font-roboto box-border h-fit bg-white p-[11px] flex gap-[10px] rounded-[10px] shadow-[0px_0px_10px_0px_#ddd] absolute top-[90px] left-1/2 transform -translate-x-1/2 z-[99999]"
+                  class="font-roboto box-border h-fit bg-white p-[11px] flex gap-[10px] rounded-[10px] shadow-[0px_0px_10px_0px_#ddd] absolute top-[0px] left-1/2 transform -translate-x-1/2 z-[99999]"
           >
             <!-- Canvas Alignment -->
             <div class="flex items-center gap-1">
@@ -2975,7 +2949,7 @@
           <div
                   id="canvas-container"
                   class="bg-white relative border border-gray-200 rounded-md overflow-hidden shadow-md font-roboto max-w-full select-none"
-                  style="width: min(1200px, 80vw); height: min(660px, 80vw); aspect-ratio: 1 / 1;"
+                  style="width: min(1000px, 80vw); height: min(660px, 80vw); aspect-ratio: 1 / 1;"
           >
             <canvas
                     id="image-editor"

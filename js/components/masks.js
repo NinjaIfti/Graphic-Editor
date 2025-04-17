@@ -1,4 +1,4 @@
-// src/components/masks.js - Clean version
+// src/components/masks.js - Improved version with better scaling and debug logs
 import { FabricImage } from 'fabric';
 
 export default function masksComponent() {
@@ -10,33 +10,59 @@ export default function masksComponent() {
 
         init() {
             this.loadMasks();
+            console.log('[MASK] Component initialized');
 
             // Listen for selection events directly in this component
             if (window.canvas) {
                 window.canvas.on('selection:created', (e) => {
                     if (e.selected && e.selected[0] && e.selected[0].type === 'image') {
                         this.cachedImageObject = e.selected[0];
+                        console.log('[MASK] Image selected:', {
+                            width: e.selected[0].width,
+                            height: e.selected[0].height,
+                            scaleX: e.selected[0].scaleX,
+                            scaleY: e.selected[0].scaleY,
+                            scaledWidth: e.selected[0].getScaledWidth(),
+                            scaledHeight: e.selected[0].getScaledHeight()
+                        });
                     }
                 });
 
                 window.canvas.on('selection:updated', (e) => {
                     if (e.selected && e.selected[0] && e.selected[0].type === 'image') {
                         this.cachedImageObject = e.selected[0];
+                        console.log('[MASK] Image selection updated:', {
+                            width: e.selected[0].width,
+                            height: e.selected[0].height,
+                            scaleX: e.selected[0].scaleX,
+                            scaleY: e.selected[0].scaleY,
+                            scaledWidth: e.selected[0].getScaledWidth(),
+                            scaledHeight: e.selected[0].getScaledHeight()
+                        });
                     } else {
                         // If selection changed to non-image, clear our cache
                         this.cachedImageObject = null;
+                        console.log('[MASK] Selection changed to non-image, clearing cache');
                     }
                 });
 
                 window.canvas.on('selection:cleared', () => {
                     // Clear our cached object when selection is cleared
                     this.cachedImageObject = null;
+                    console.log('[MASK] Selection cleared, cache reset');
                 });
+            } else {
+                console.warn('[MASK] Canvas not initialized yet');
             }
         },
 
         applyMask(maskSrc) {
-            if (!window.canvas) return;
+            if (!window.canvas) {
+                console.error('[MASK] Canvas not available');
+                return;
+            }
+
+            console.log('[MASK] Applying mask:', maskSrc);
 
             // Try to get the active object, fall back to our cached image if needed
             let targetObject = window.canvas.getActiveObject();
@@ -46,10 +72,21 @@ export default function masksComponent() {
                 targetObject = this.cachedImageObject;
                 // Reselect it to make it the active object
                 window.canvas.setActiveObject(targetObject);
+                console.log('[MASK] Using cached image object');
             }
 
             // Final check if we have a valid image
-            if (!targetObject || targetObject.type !== 'image') return;
+            if (!targetObject || targetObject.type !== 'image') {
+                console.error('[MASK] No valid image selected');
+                return;
+            }
+
+            console.log('[MASK] Target image dimensions:', {
+                original: { width: targetObject.width, height: targetObject.height },
+                scale: { x: targetObject.scaleX, y: targetObject.scaleY },
+                scaled: { width: targetObject.getScaledWidth(), height: targetObject.getScaledHeight() },
+                display: { width: targetObject.width * targetObject.scaleX, height: targetObject.height * targetObject.scaleY }
+            });
 
             // Clear existing clipPath directly before loading the new mask
             targetObject.clipPath = null;
@@ -61,31 +98,44 @@ export default function masksComponent() {
 
             img.onload = () => {
                 try {
+                    console.log('[MASK] Mask loaded:', {
+                        width: img.width,
+                        height: img.height,
+                        src: maskSrc
+                    });
+
                     // Create a Fabric image from the loaded image
                     const mask = new FabricImage(img);
 
-                    // Get image dimensions - use width and height, not scaled values
-                    // This ensures we work with the actual image dimensions
-                    const width = targetObject.getScaledWidth();
-                    const height = targetObject.getScaledHeight();
+                    // IMPORTANT: Always use the original dimensions (not scaled)
+                    // This ensures consistent behavior across different image sizes
+                    const imageWidth = targetObject.width;
+                    const imageHeight = targetObject.height;
 
-                    // Determine which dimension to match (width or height)
-                    // Based on which would preserve the mask's aspect ratio best
-                    const maskAspectRatio = mask.width / mask.height;
-                    const imageAspectRatio = width / height;
+                    console.log('[MASK] Working with original dimensions:', {
+                        imageWidth,
+                        imageHeight,
+                        maskWidth: mask.width,
+                        maskHeight: mask.height
+                    });
 
-                    let scaleToUse;
+                    // Scale the mask properly to cover the entire image area
+                    // Making sure the mask fully covers the image in both dimensions
+                    const scaleX = imageWidth / mask.width;
+                    const scaleY = imageHeight / mask.height;
 
-                    if (maskAspectRatio > imageAspectRatio) {
-                        // If mask is wider than image (proportionally), scale to height
-                        scaleToUse = height / mask.height;
-                    } else {
-                        // If mask is taller than image (proportionally), scale to width
-                        scaleToUse = width / mask.width;
-                    }
+                    // Use the larger scale to ensure full coverage
+                    const scaleFactor = Math.max(scaleX, scaleY);
 
-                    // Apply the calculated scale uniformly
-                    mask.scale(scaleToUse);
+                    console.log('[MASK] Calculated scale factors:', {
+                        scaleX,
+                        scaleY,
+                        finalScale: scaleFactor
+                    });
+
+                    // Apply scaling to mask (using scaleX and scaleY separately for clarity)
+                    mask.scaleX = scaleFactor;
+                    mask.scaleY = scaleFactor;
 
                     // Center the mask on the image
                     mask.set({
@@ -97,6 +147,15 @@ export default function masksComponent() {
                         inverted: false
                     });
 
+                    console.log('[MASK] Final mask properties:', {
+                        scaleX: mask.scaleX,
+                        scaleY: mask.scaleY,
+                        width: mask.width * mask.scaleX,
+                        height: mask.height * mask.scaleY,
+                        left: mask.left,
+                        top: mask.top
+                    });
+
                     // Apply the new clipPath
                     targetObject.clipPath = mask;
 
@@ -104,9 +163,15 @@ export default function masksComponent() {
                     window.canvas.requestRenderAll();
                     window.fabricComponent.addToHistory();
                     this.selectedMask = maskSrc;
+
+                    console.log('[MASK] Mask applied successfully');
                 } catch (error) {
-                    // Silent error handling
+                    console.error('[MASK] Error applying mask:', error);
                 }
+            };
+
+            img.onerror = (err) => {
+                console.error('[MASK] Failed to load mask image:', err);
             };
 
             // Start loading the image
@@ -114,7 +179,12 @@ export default function masksComponent() {
         },
 
         removeMask() {
-            if (!window.canvas) return;
+            if (!window.canvas) {
+                console.error('[MASK] Canvas not available');
+                return;
+            }
+
+            console.log('[MASK] Removing mask');
 
             // Try to get the active object, fall back to our cached image if needed
             let targetObject = window.canvas.getActiveObject();
@@ -124,9 +194,13 @@ export default function masksComponent() {
                 targetObject = this.cachedImageObject;
                 // Reselect it to make it the active object
                 window.canvas.setActiveObject(targetObject);
+                console.log('[MASK] Using cached image for mask removal');
             }
 
-            if (!targetObject) return;
+            if (!targetObject) {
+                console.error('[MASK] No target object found for mask removal');
+                return;
+            }
 
             // Remove clipPath
             targetObject.clipPath = null;
@@ -135,6 +209,7 @@ export default function masksComponent() {
             window.canvas.requestRenderAll();
             window.fabricComponent.addToHistory();
             this.selectedMask = null;
+            console.log('[MASK] Mask removed successfully');
         },
 
         loadMasks() {
@@ -144,6 +219,7 @@ export default function masksComponent() {
                 {id: 'mask3', name: 'Mask 3', src: './images/mask/3.svg'},
                 {id: 'mask5', name: 'Mask 5', src: './images/mask/5.svg'}
             ];
+            console.log('[MASK] Mask items loaded:', this.maskItems.length);
         }
     };
 }

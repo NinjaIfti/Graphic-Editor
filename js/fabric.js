@@ -457,17 +457,30 @@ export default function fabricComponent() {
                 // Get the canvas container element
                 const canvasContainer = document.getElementById('canvas-container');
 
-                // Set size to be square (same width and height)
-                const containerSize = Math.min(canvasContainer.clientWidth, canvasContainer.clientHeight);
+                // Default 1080p resolution
+                const defaultWidth = 1920;
+                const defaultHeight = 1080;
 
-                // Create canvas with square dimensions
-                const canvas = new Canvas("image-editor", {
+                // Determine the container size (max width of 1200px, height of 660px)
+                const containerWidth = canvasContainer.clientWidth;
+                const containerHeight = canvasContainer.clientHeight;
+
+                // Set the canvas width and height based on container size
+                const width = Math.min(defaultWidth, containerWidth);
+                const height = Math.min(defaultHeight, containerHeight);
+
+                // Create canvas with 1080p or container size
+                const canvas = new fabric.Canvas("image-editor", {
                     preserveObjectStacking: true,
-                    width: containerSize,
-                    height: containerSize, // Make sure height equals width
+                    width: width,
+                    height: height,
                     backgroundColor: "#ffffff",
                     enableRetinaScaling: true,
                     renderOnAddRemove: false,
+                    selection: true, // Enable multiple selection by default
+                    selectionBorderColor: 'blue', // Optional: Selection border color
+                    selectionColor: 'rgba(0, 0, 255, 0.3)', // Selection area color (light blue)
+                    selectionLineWidth: 2, // Line width of the selection border
                 });
 
                 // Store canvas reference globally and in Alpine state
@@ -477,24 +490,33 @@ export default function fabricComponent() {
                 // Make this component accessible globally for child components
                 window.fabricComponent = this;
 
-                // Add proper resize handling to maintain square aspect ratio
-                window.addEventListener('resize', () => {
-                    // Get new container size (should be square)
-                    const newSize = Math.min(canvasContainer.clientWidth, canvasContainer.clientHeight);
+                // Enable multi-selection via Shift or Ctrl (Cmd) key
+                canvas.on('mouse:down', function (options) {
+                    const isCtrlKey = options.e.ctrlKey || options.e.metaKey; // Ctrl on Windows/Linux, Cmd on Mac
+                    const isShiftKey = options.e.shiftKey;
 
-                    // Update canvas dimensions as a square
+                    // Allow multi-selection when Shift or Ctrl (Cmd) is pressed
+                    if (isCtrlKey || isShiftKey) {
+                        canvas.isSelection = true;
+                    }
+                });
+
+                // Add proper resize handling to maintain aspect ratio or default size
+                window.addEventListener('resize', () => {
+                    const newWidth = Math.min(defaultWidth, canvasContainer.clientWidth);
+                    const newHeight = Math.min(defaultHeight, canvasContainer.clientHeight);
+
+                    // Update canvas dimensions, maintaining 1080p or resizing to container's available space
                     canvas.setDimensions({
-                        width: newSize,
-                        height: newSize // Equal to width for square
+                        width: newWidth,
+                        height: newHeight
                     });
 
                     // Re-center all objects
                     const objects = canvas.getObjects();
                     if (objects.length > 0) {
-                        const selection = new ActiveSelection(objects, {canvas: canvas});
-                        // Use centerH and centerV instead of center
-                        selection.centerH();
-                        selection.centerV();
+                        const selection = new fabric.ActiveSelection(objects, {canvas: canvas});
+                        selection.center();
                         canvas.discardActiveObject();
                         canvas.requestRenderAll();
                     }
@@ -503,11 +525,7 @@ export default function fabricComponent() {
                 // Make wheel event passive for better performance
                 if (canvas.wrapperEl) {
                     const originalAddEventListener = canvas.wrapperEl.addEventListener;
-                    canvas.wrapperEl.addEventListener = function (
-                        type,
-                        listener,
-                        options
-                    ) {
+                    canvas.wrapperEl.addEventListener = function (type, listener, options) {
                         if (type === "wheel") {
                             if (typeof options === "object") {
                                 options.passive = true;
@@ -532,14 +550,244 @@ export default function fabricComponent() {
 
                 // Ensure canvas is properly centered initially
                 setTimeout(() => {
-                    // Use the fixed centerAll method
                     this.centerAll();
                     canvas.requestRenderAll();
                 }, 100);
+
+                this.toolbar = {
+                    // Properties
+                    hasSelection: false,
+                    canCrop: false,
+                    cropActive: false,
+                    isMultiSelection: false,
+
+                    // Initialize event listeners for selection state
+                    init() {
+                        if (window.canvas) {
+                            window.canvas.on('selection:created', () => {
+                                this.hasSelection = true;
+                                this.canCrop = window.canvas.getActiveObject().type === 'image';
+                            });
+
+                            window.canvas.on('selection:updated', () => {
+                                this.hasSelection = true;
+                                this.canCrop = window.canvas.getActiveObject().type === 'image';
+                            });
+
+                            window.canvas.on('selection:cleared', () => {
+                                this.hasSelection = false;
+                                this.canCrop = false;
+                            });
+                        }
+
+                        // Initial state check
+                        this.updateSelectionState();
+                    },
+
+                    // Main alignment method without console logging
+                    alignObjects(type) {
+                        if (!window.canvas) return;
+
+                        const activeObject = window.canvas.getActiveObject();
+                        if (!activeObject) return;
+
+                        // Check if we have a single object or multiple objects
+                        const isMultipleSelection = (activeObject.type === 'activeselection' || activeObject.type === 'group');
+
+                        if (!isMultipleSelection) {
+                            // CASE 1: Single object - align relative to the canvas
+                            const canvasWidth = window.canvas.width;
+                            const canvasHeight = window.canvas.height;
+                            const objectWidth = activeObject.getScaledWidth();
+                            const objectHeight = activeObject.getScaledHeight();
+
+                            switch (type) {
+                                case 'left':
+                                    activeObject.set({
+                                        left: 0
+                                    });
+                                    break;
+                                case 'centerH':
+                                    activeObject.set({
+                                        left: (canvasWidth / 2) - (objectWidth / 2)
+                                    });
+                                    break;
+                                case 'right':
+                                    activeObject.set({
+                                        left: canvasWidth - objectWidth
+                                    });
+                                    break;
+                                case 'top':
+                                    activeObject.set({
+                                        top: 0
+                                    });
+                                    break;
+                                case 'centerV':
+                                    activeObject.set({
+                                        top: (canvasHeight / 2) - (objectHeight / 2)
+                                    });
+                                    break;
+                                case 'bottom':
+                                    activeObject.set({
+                                        top: canvasHeight - objectHeight
+                                    });
+                                    break;
+                            }
+                        } else {
+                            // Get all the objects in the selection
+                            const objects = activeObject.getObjects();
+                            if (objects.length <= 1) return; // Nothing to align with just one object
+
+                            // Remember the original position of the group
+                            const originalLeft = activeObject.left;
+                            const originalTop = activeObject.top;
+
+                            // Get the bounding box (blue box that appears when multiple objects are selected)
+                            const boundingBox = activeObject.getBoundingRect(true);
+
+                            // Calculate important points of the bounding box
+                            const boxLeft = boundingBox.left;
+                            const boxTop = boundingBox.top;
+                            const boxWidth = boundingBox.width;
+                            const boxHeight = boundingBox.height;
+                            const boxRight = boxLeft + boxWidth;
+                            const boxBottom = boxTop + boxHeight;
+                            const boxCenterX = boxLeft + (boxWidth / 2);
+                            const boxCenterY = boxTop + (boxHeight / 2);
+
+                            // For each object, calculate new position based on the bounding box
+                            objects.forEach(obj => {
+                                // Get object's actual bounding rectangle
+                                const objBounds = obj.getBoundingRect(true);
+                                const objWidth = objBounds.width;
+                                const objHeight = objBounds.height;
+
+                                // Calculate current positions
+                                const objLeft = objBounds.left;
+                                const objTop = objBounds.top;
+                                const objRight = objLeft + objWidth;
+                                const objBottom = objTop + objHeight;
+                                const objCenterX = objLeft + (objWidth / 2);
+                                const objCenterY = objTop + (objHeight / 2);
+
+                                // Calculate needed position change
+                                let deltaX = 0;
+                                let deltaY = 0;
+
+                                switch (type) {
+                                    case 'left':
+                                        // Align to left edge of bounding box
+                                        deltaX = boxLeft - objLeft;
+                                        break;
+                                    case 'centerH':
+                                        // Align to horizontal center of bounding box
+                                        deltaX = boxCenterX - objCenterX;
+                                        break;
+                                    case 'right':
+                                        // Align to right edge of bounding box
+                                        deltaX = boxRight - objRight;
+                                        break;
+                                    case 'top':
+                                        // Align to top edge of bounding box
+                                        deltaY = boxTop - objTop;
+                                        break;
+                                    case 'centerV':
+                                        // Align to vertical center of bounding box
+                                        deltaY = boxCenterY - objCenterY;
+                                        break;
+                                    case 'bottom':
+                                        // Align to bottom edge of bounding box
+                                        deltaY = boxBottom - objBottom;
+                                        break;
+                                }
+
+                                // Apply the position change to the object
+                                if (deltaX !== 0) {
+                                    obj.set('left', obj.left + deltaX);
+                                }
+                                if (deltaY !== 0) {
+                                    obj.set('top', obj.top + deltaY);
+                                }
+                            });
+
+                            // Restore original group position to prevent it from moving
+                            activeObject.set({
+                                left: originalLeft,
+                                top: originalTop
+                            });
+                        }
+
+                        // Update object coordinates
+                        activeObject.setCoords();
+
+                        // Update canvas
+                        window.canvas.requestRenderAll();
+
+                        // Add to history
+                        if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                            window.fabricComponent.addToHistory();
+                        }
+                    },
+
+                    // Update selection state property
+                    updateSelectionState() {
+                        this.hasSelection = window.canvas && window.canvas.getActiveObjects().length > 0;
+                        return this.hasSelection;
+                    },
+
+                    // Additional toolbar methods
+                    startCrop() {
+                        if (!window.canvas) return;
+                        const activeObject = window.canvas.getActiveObject();
+                        if (!activeObject || activeObject.type !== 'image') return;
+                        this.cropActive = true;
+                        // Rest of crop implementation...
+                    },
+
+                    applyCrop() {
+                        if (!window.canvas || !this.cropActive) return;
+                        // Crop implementation...
+                        this.cropActive = false;
+                    },
+
+                    resetCrop() {
+                        if (!window.canvas || !this.cropActive) return;
+                        // Reset crop implementation...
+                        this.cropActive = false;
+                    },
+
+                    deleteSelected() {
+                        if (!window.canvas) return;
+                        const activeObject = window.canvas.getActiveObject();
+                        if (activeObject) {
+                            if (activeObject.type === 'activeselection') {
+                                // For multiple selected objects
+                                activeObject.forEachObject((obj) => {
+                                    window.canvas.remove(obj);
+                                });
+                                // Clear the selection
+                                window.canvas.discardActiveObject();
+                            } else {
+                                // For single selected object
+                                window.canvas.remove(activeObject);
+                            }
+
+                            window.canvas.requestRenderAll();
+                            this.hasSelection = false;
+
+                            // Add to history
+                            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                                window.fabricComponent.addToHistory();
+                            }
+                        }
+                    }
+                };
+
             } catch (error) {
                 console.error("Error initializing canvas:", error);
             }
         },
+
         handleSelection(e) {
             try {
                 const activeObject = this.canvas.getActiveObject();
