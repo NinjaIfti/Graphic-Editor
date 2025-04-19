@@ -11,7 +11,7 @@ export default function toolbarComponent() {
         showRulers: false,
         showGuides: false,
         snapToGrid: false,
-        
+
         getHasSelection() {
             return this.hasSelection;
         },
@@ -331,7 +331,8 @@ export default function toolbarComponent() {
                 addToHistory();
             }
         },
-
+        
+// Start the crop operation
         startCrop() {
             if (!window.canvas) return;
 
@@ -341,8 +342,8 @@ export default function toolbarComponent() {
 
             this.cropActive = true;
 
-            // Store original state for potential cancellation
-            this._originalObjectState = {
+            // Store original image state for potential cancellation
+            this._originalImageState = {
                 width: activeObject.width,
                 height: activeObject.height,
                 scaleX: activeObject.scaleX,
@@ -351,150 +352,172 @@ export default function toolbarComponent() {
                 top: activeObject.top,
                 cropX: activeObject.cropX || 0,
                 cropY: activeObject.cropY || 0,
+                originX: activeObject.originX || 'center',
+                originY: activeObject.originY || 'center'
             };
 
-            // Create crop overlay with controls
-            const cropRect = new Rect({
-                left: activeObject.left,
-                top: activeObject.top,
-                width: activeObject.getScaledWidth(),
-                height: activeObject.getScaledHeight(),
-                fill: 'rgba(0,0,0,0.3)',
-                stroke: '#fff',
-                strokeWidth: 2,
-                strokeDashArray: [5, 5],
-                originX: activeObject.originX,
-                originY: activeObject.originY,
-                name: 'cropOverlay',
-                selectable: true,
-                evented: true,
-            });
+            // Store reference to the image being cropped
+            this._imageBeingCropped = activeObject;
 
-            window.canvas.add(cropRect);
-            window.canvas.setActiveObject(cropRect);
+            // Calculate the actual display dimensions
+            const width = activeObject.getScaledWidth();
+            const height = activeObject.getScaledHeight();
 
-            // Create confirm and cancel buttons
-            this.createCropControls();
+            try {
+                // Create crop overlay - use fabric directly from window
+                const cropRect = new fabric.Rect({
+                    left: activeObject.left,
+                    top: activeObject.top,
+                    width: width,
+                    height: height,
+                    fill: 'rgba(0,0,0,0.3)',
+                    stroke: '#fff',
+                    strokeWidth: 2,
+                    strokeDashArray: [5, 5],
+                    originX: activeObject.originX || 'center',
+                    originY: activeObject.originY || 'center',
+                    name: 'cropOverlay',
+                    cornerColor: 'white',
+                    cornerSize: 10,
+                    transparentCorners: false,
+                    lockRotation: true,
+                    hasRotatingPoint: false
+                });
 
-            // Listen for crop overlay modifications
-            window.canvas.on('object:modified', this.updateCrop.bind(this));
+                // Hide the original image's controls
+                activeObject.hasControls = false;
+                activeObject.selectable = false;
+                activeObject.evented = false;
+
+                window.canvas.add(cropRect);
+                window.canvas.setActiveObject(cropRect);
+                window.canvas.requestRenderAll();
+            } catch (error) {
+                // Reset if there's an error
+                this.cropActive = false;
+            }
         },
 
-        // Create crop confirmation controls
-        createCropControls() {
-            // Create UI elements for crop controls
-            const controlsContainer = document.createElement('div');
-            controlsContainer.id = 'crop-controls';
-            controlsContainer.style = 'position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;';
-
-            const confirmBtn = document.createElement('button');
-            confirmBtn.textContent = 'Apply Crop';
-            confirmBtn.onclick = this.applyCrop.bind(this);
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.onclick = this.cancelCrop.bind(this);
-
-            controlsContainer.appendChild(confirmBtn);
-            controlsContainer.appendChild(cancelBtn);
-
-            document.body.appendChild(controlsContainer);
-        },
-
-        // Update crop preview based on overlay position
-        updateCrop(e) {
-            if (!this.cropActive) return;
-
-            const cropOverlay = e.target;
-            if (!cropOverlay || cropOverlay.name !== 'cropOverlay') return;
-
-            // TODO: Update crop preview based on overlay
-        },
-
-        // Apply the crop
+// Apply the crop
         applyCrop() {
             if (!window.canvas) return;
 
-            // Get the cropOverlay and the image
-            const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
-            if (!cropOverlay) return;
+            try {
+                // Get the cropOverlay
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (!cropOverlay) return;
 
-            const imageObjects = window.canvas.getObjects().filter(obj => obj.type === 'image');
-            if (imageObjects.length === 0) return;
+                // Get the image to crop
+                const imageObject = this._imageBeingCropped;
+                if (!imageObject) return;
 
-            // Get the image to crop (usually the one beneath the overlay)
-            const imageObject = imageObjects[0];
+                // Get crop dimensions
+                const overlayLeft = cropOverlay.left;
+                const overlayTop = cropOverlay.top;
+                const overlayWidth = cropOverlay.getScaledWidth();
+                const overlayHeight = cropOverlay.getScaledHeight();
 
-            // Calculate crop coordinates
-            // This is a simplified example - actual implementation would need to handle
-            // rotation, scaling, etc. properly
-            const cropX = (cropOverlay.left - imageObject.left) / imageObject.scaleX;
-            const cropY = (cropOverlay.top - imageObject.top) / imageObject.scaleY;
-            const cropWidth = cropOverlay.width / imageObject.scaleX;
-            const cropHeight = cropOverlay.height / imageObject.scaleY;
+                // Get image dimensions
+                const imgLeft = imageObject.left;
+                const imgTop = imageObject.top;
+                const imgScaleX = imageObject.scaleX;
+                const imgScaleY = imageObject.scaleY;
 
-            // Apply cropping to the image
-            imageObject.set({
-                cropX: cropX,
-                cropY: cropY,
-                width: cropWidth,
-                height: cropHeight
-            });
+                // Calculate offset from image center to crop center
+                // This works with the default center origin point
+                const offsetX = overlayLeft - imgLeft;
+                const offsetY = overlayTop - imgTop;
 
-            // Clean up
-            this.cleanupCrop();
+                // Calculate crop parameters in image internal coordinates
+                // These formulas work with center origin points
+                const cropX = (imageObject.width / 2) - (overlayWidth / (2 * imgScaleX)) + (offsetX / imgScaleX);
+                const cropY = (imageObject.height / 2) - (overlayHeight / (2 * imgScaleY)) + (offsetY / imgScaleY);
 
-            // Render changes
-            window.canvas.requestRenderAll();
+                // Apply the crop to the image
+                imageObject.set({
+                    cropX: cropX,
+                    cropY: cropY,
+                    width: overlayWidth / imgScaleX,
+                    height: overlayHeight / imgScaleY
+                });
 
-            // Add to history
-            if (typeof addToHistory === 'function') {
-                addToHistory();
+                // Restore selection abilities
+                imageObject.hasControls = true;
+                imageObject.selectable = true;
+                imageObject.evented = true;
+
+                // Clean up crop overlay
+                window.canvas.remove(cropOverlay);
+
+                // Reset crop state
+                this.cropActive = false;
+
+                // Reselect the image
+                window.canvas.setActiveObject(imageObject);
+                window.canvas.requestRenderAll();
+
+                // Add to history
+                if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
+                }
+
+                // Update image in uploads component if it exists
+                if (window.fabricComponent && window.fabricComponent.uploads) {
+                    window.fabricComponent.uploads.selectedObject = imageObject;
+                    window.fabricComponent.uploads.selectedImage = imageObject;
+                    if (typeof window.fabricComponent.uploads.syncObjectProperties === 'function') {
+                        window.fabricComponent.uploads.syncObjectProperties();
+                    }
+                }
+            } catch (error) {
+                // Reset state on error
+                this.cropActive = false;
+
+                // Clean up anyway
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (cropOverlay) {
+                    window.canvas.remove(cropOverlay);
+                }
             }
         },
 
-        // Cancel crop operation
+// Cancel crop operation
         cancelCrop() {
             if (!window.canvas) return;
 
-            // Restore original state if available
-            if (this._originalObjectState) {
-                const imageObjects = window.canvas.getObjects().filter(obj => obj.type === 'image');
-                if (imageObjects.length > 0) {
-                    const imageObject = imageObjects[0];
-                    imageObject.set(this._originalObjectState);
+            try {
+                // Restore original state if available
+                if (this._originalImageState && this._imageBeingCropped) {
+                    this._imageBeingCropped.set(this._originalImageState);
+                    this._imageBeingCropped.hasControls = true;
+                    this._imageBeingCropped.selectable = true;
+                    this._imageBeingCropped.evented = true;
                 }
+
+                // Remove crop overlay
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (cropOverlay) {
+                    window.canvas.remove(cropOverlay);
+                }
+
+                // Reset state
+                this.cropActive = false;
+
+                // Reselect the image
+                if (this._imageBeingCropped) {
+                    window.canvas.setActiveObject(this._imageBeingCropped);
+                }
+
+                window.canvas.requestRenderAll();
+            } catch (error) {
+                // Reset state on error
+                this.cropActive = false;
             }
-
-            // Clean up
-            this.cleanupCrop();
-
-            // Render changes
-            window.canvas.requestRenderAll();
         },
 
-        // Clean up after crop operation
-        cleanupCrop() {
-            if (!window.canvas) return;
-
-            // Remove crop overlay
-            const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
-            if (cropOverlay) {
-                window.canvas.remove(cropOverlay);
-            }
-
-            // Remove event listener
-            window.canvas.off('object:modified', this.updateCrop);
-
-            // Remove control buttons
-            const controlsContainer = document.getElementById('crop-controls');
-            if (controlsContainer) {
-                controlsContainer.remove();
-            }
-
-            // Reset state
-            this.cropActive = false;
-            this._originalObjectState = null;
+// Reset crop for the toolbar button
+        resetCrop() {
+            this.cancelCrop();
         },
 
         // Group selected objects
