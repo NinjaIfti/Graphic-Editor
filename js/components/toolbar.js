@@ -12,7 +12,12 @@ export default function toolbarComponent() {
         showGuides: false,
         snapToGrid: false,
 
+        getHasSelection() {
+            return this.hasSelection;
+        },
+
         // Initialize toolbar
+
         init() {
             // Listen for selection events
             if (window.canvas) {
@@ -70,179 +75,200 @@ export default function toolbarComponent() {
             }));
         },
 
-        // Updated alignObjects method for toolbar.js component
-
-        alignObjects(direction) {
+        // alignment function
+        alignObjects(type) {
             if (!window.canvas) return;
 
             const activeObject = window.canvas.getActiveObject();
             if (!activeObject) return;
 
-            // Check if we have a single object or multiple objects
-            const isMultipleSelection = (activeObject.type === 'activeSelection' || activeObject.type === 'group');
+            // Check if we have a single object or multiple objects - fixed case sensitivity
+            const isMultipleSelection = (activeObject.type === 'activeselection' || activeObject.type === 'group');
 
             if (!isMultipleSelection) {
                 // CASE 1: Single object - align relative to the canvas
-                let targetX, targetY;
                 const canvasWidth = window.canvas.width;
                 const canvasHeight = window.canvas.height;
-
-                // Get object bounds
                 const objectWidth = activeObject.getScaledWidth();
                 const objectHeight = activeObject.getScaledHeight();
 
-                // Calculate target position based on alignment direction
-                // Account for object origin points (top-left, center, etc.)
-                switch (direction) {
+                switch (type) {
                     case 'left':
-                        // Align left edge to left canvas edge
-                        targetX = 0;
-                        if (activeObject.originX === 'center') {
-                            targetX = objectWidth / 2;
-                        }
-                        activeObject.set('left', targetX);
+                        activeObject.set({
+                            left: 0
+                        });
                         break;
-
                     case 'centerH':
-                        // Align center horizontally
-                        targetX = canvasWidth / 2;
-                        if (activeObject.originX !== 'center') {
-                            targetX = canvasWidth / 2 + (objectWidth / 2);
-                        }
-                        activeObject.set('left', targetX);
+                        activeObject.set({
+                            left: (canvasWidth / 2) - (objectWidth / 2)
+                        });
                         break;
-
                     case 'right':
-                        // Align right edge to right canvas edge
-                        targetX = canvasWidth;
-                        if (activeObject.originX === 'center') {
-                            targetX = canvasWidth - (objectWidth / 2);
-                        } else {
-                            targetX = canvasWidth - objectWidth;
-                        }
-                        activeObject.set('left', targetX);
+                        activeObject.set({
+                            left: canvasWidth - objectWidth
+                        });
                         break;
-
                     case 'top':
-                        // Align top edge to top canvas edge
-                        targetY = 0;
-                        if (activeObject.originY === 'center') {
-                            targetY = objectHeight / 2;
-                        }
-                        activeObject.set('top', targetY);
+                        activeObject.set({
+                            top: 0
+                        });
                         break;
-
                     case 'centerV':
-                        // Align center vertically
-                        targetY = canvasHeight / 2;
-                        if (activeObject.originY !== 'center') {
-                            targetY = canvasHeight / 2 + (objectHeight / 2);
-                        }
-                        activeObject.set('top', targetY);
+                        activeObject.set({
+                            top: (canvasHeight / 2) - (objectHeight / 2)
+                        });
                         break;
-
                     case 'bottom':
-                        // Align bottom edge to bottom canvas edge
-                        targetY = canvasHeight;
-                        if (activeObject.originY === 'center') {
-                            targetY = canvasHeight - (objectHeight / 2);
-                        } else {
-                            targetY = canvasHeight - objectHeight;
-                        }
-                        activeObject.set('top', targetY);
+                        activeObject.set({
+                            top: canvasHeight - objectHeight
+                        });
                         break;
                 }
             } else {
-                // CASE 2: Multiple objects - align them relative to each other
+                // Get all the objects in the selection
                 const objects = activeObject.getObjects();
                 if (objects.length <= 1) return; // Nothing to align with just one object
 
-                // Calculate bounds for all objects in the selection
-                let minLeft = Infinity, maxRight = -Infinity, minTop = Infinity, maxBottom = -Infinity;
+                // Remember the original position of the group
+                const originalLeft = activeObject.left;
+                const originalTop = activeObject.top;
 
-                // First pass: get the bounds
-                objects.forEach(obj => {
-                    // Account for object transformations
-                    const objBounds = obj.getBoundingRect(true, true);
-                    minLeft = Math.min(minLeft, objBounds.left);
-                    maxRight = Math.max(maxRight, objBounds.left + objBounds.width);
-                    minTop = Math.min(minTop, objBounds.top);
-                    maxBottom = Math.max(maxBottom, objBounds.top + objBounds.height);
-                });
+                // For horizontal alignment, we need special handling
+                if (type === 'left' || type === 'centerH' || type === 'right') {
+                    // Find leftmost and rightmost objects in the selection
+                    let minLeft = Infinity;
+                    let maxRight = -Infinity;
 
-                // The center point of the selection
-                const selectionCenterX = (minLeft + maxRight) / 2;
-                const selectionCenterY = (minTop + maxBottom) / 2;
+                    objects.forEach(obj => {
+                        // Get local coordinates inside the group
+                        const left = obj.left;
+                        const right = left + (obj.width * obj.scaleX);
 
-                // Second pass: align objects based on direction
-                switch (direction) {
-                    case 'left':
-                        // Align all objects' left edges to the leftmost point
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const deltaX = minLeft - objBounds.left;
-                            obj.set('left', obj.left + deltaX);
-                        });
-                        break;
+                        minLeft = Math.min(minLeft, left);
+                        maxRight = Math.max(maxRight, right);
+                    });
 
-                    case 'centerH':
-                        // Align all objects to the horizontal center of the selection
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const objCenterX = objBounds.left + (objBounds.width / 2);
-                            const deltaX = selectionCenterX - objCenterX;
-                            obj.set('left', obj.left + deltaX);
-                        });
-                        break;
+                    const selectionWidth = maxRight - minLeft;
+                    const selectionCenter = minLeft + selectionWidth / 2;
 
-                    case 'right':
-                        // Align all objects' right edges to the rightmost point
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const objRight = objBounds.left + objBounds.width;
-                            const deltaX = maxRight - objRight;
-                            obj.set('left', obj.left + deltaX);
-                        });
-                        break;
+                    // Apply alignment directly based on object's position within the group
+                    objects.forEach(obj => {
+                        const objWidth = obj.width * obj.scaleX;
 
-                    case 'top':
-                        // Align all objects' top edges to the topmost point
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const deltaY = minTop - objBounds.top;
+                        switch (type) {
+                            case 'left':
+                                // Align all objects to the left edge
+                                obj.set('left', minLeft);
+                                break;
+
+                            case 'centerH':
+                                // Align all objects to horizontal center
+                                obj.set('left', selectionCenter - (objWidth / 2));
+                                break;
+
+                            case 'right':
+                                // Align all objects to right edge
+                                obj.set('left', maxRight - objWidth);
+                                break;
+                        }
+                    });
+                } else {
+                    // Vertical alignment - existing code that's working
+                    // Get the bounding box
+                    const boundingBox = activeObject.getBoundingRect(true);
+
+                    // Calculate important points of the bounding box
+                    const boxTop = boundingBox.top;
+                    const boxHeight = boundingBox.height;
+                    const boxBottom = boxTop + boxHeight;
+                    const boxCenterY = boxTop + (boxHeight / 2);
+
+                    // For each object, calculate new position based on the bounding box
+                    objects.forEach(obj => {
+                        // Get object's actual bounding rectangle
+                        const objBounds = obj.getBoundingRect(true);
+                        const objHeight = objBounds.height;
+
+                        // Calculate current positions
+                        const objTop = objBounds.top;
+                        const objBottom = objTop + objHeight;
+                        const objCenterY = objTop + (objHeight / 2);
+
+                        // Calculate needed position change
+                        let deltaY = 0;
+
+                        switch (type) {
+                            case 'top':
+                                // Align to top edge of bounding box
+                                deltaY = boxTop - objTop;
+                                break;
+                            case 'centerV':
+                                // Align to vertical center of bounding box
+                                deltaY = boxCenterY - objCenterY;
+                                break;
+                            case 'bottom':
+                                // Align to bottom edge of bounding box
+                                deltaY = boxBottom - objBottom;
+                                break;
+                        }
+
+                        // Apply the position change to the object
+                        if (deltaY !== 0) {
                             obj.set('top', obj.top + deltaY);
-                        });
-                        break;
-
-                    case 'centerV':
-                        // Align all objects to the vertical center of the selection
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const objCenterY = objBounds.top + (objBounds.height / 2);
-                            const deltaY = selectionCenterY - objCenterY;
-                            obj.set('top', obj.top + deltaY);
-                        });
-                        break;
-
-                    case 'bottom':
-                        // Align all objects' bottom edges to the bottommost point
-                        objects.forEach(obj => {
-                            const objBounds = obj.getBoundingRect(true, true);
-                            const objBottom = objBounds.top + objBounds.height;
-                            const deltaY = maxBottom - objBottom;
-                            obj.set('top', obj.top + deltaY);
-                        });
-                        break;
+                        }
+                    });
                 }
+
+                // Make sure the group doesn't move
+                activeObject.set({
+                    left: originalLeft,
+                    top: originalTop
+                });
             }
 
-            // Update object coordinates and render
+            // Update object coordinates
             activeObject.setCoords();
+
+            // Update canvas
             window.canvas.requestRenderAll();
 
             // Add to history
-            if (typeof addToHistory === 'function') {
-                addToHistory();
+            if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                window.fabricComponent.addToHistory();
+            }
+        },
+
+        deleteSelected() {
+            if (!window.canvas) return;
+
+            const activeObject = window.canvas.getActiveObject();
+            if (activeObject) {
+                if (activeObject.type === 'activeselection') {
+                    // For multiple selected objects
+                    activeObject.forEachObject((obj) => {
+                        window.canvas.remove(obj);
+                    });
+                    // Clear the selection
+                    window.canvas.discardActiveObject();
+                } else {
+                    // For single selected object
+                    window.canvas.remove(activeObject);
+                }
+
+                window.canvas.requestRenderAll();
+                this.hasSelection = false;
+
+                // Add to history
+                if (typeof addToHistory === 'function') {
+                    addToHistory();
+                } else if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
+                }
+
+                // Update layers panel if needed
+                window.dispatchEvent(new CustomEvent('object:removed', {
+                    detail: {object: activeObject}
+                }));
             }
         },
 
@@ -305,7 +331,8 @@ export default function toolbarComponent() {
                 addToHistory();
             }
         },
-
+        
+// Start the crop operation
         startCrop() {
             if (!window.canvas) return;
 
@@ -315,8 +342,8 @@ export default function toolbarComponent() {
 
             this.cropActive = true;
 
-            // Store original state for potential cancellation
-            this._originalObjectState = {
+            // Store original image state for potential cancellation
+            this._originalImageState = {
                 width: activeObject.width,
                 height: activeObject.height,
                 scaleX: activeObject.scaleX,
@@ -325,182 +352,172 @@ export default function toolbarComponent() {
                 top: activeObject.top,
                 cropX: activeObject.cropX || 0,
                 cropY: activeObject.cropY || 0,
+                originX: activeObject.originX || 'center',
+                originY: activeObject.originY || 'center'
             };
 
-            // Create crop overlay with controls
-            const cropRect = new Rect({
-                left: activeObject.left,
-                top: activeObject.top,
-                width: activeObject.getScaledWidth(),
-                height: activeObject.getScaledHeight(),
-                fill: 'rgba(0,0,0,0.3)',
-                stroke: '#fff',
-                strokeWidth: 2,
-                strokeDashArray: [5, 5],
-                originX: activeObject.originX,
-                originY: activeObject.originY,
-                name: 'cropOverlay',
-                selectable: true,
-                evented: true,
-            });
+            // Store reference to the image being cropped
+            this._imageBeingCropped = activeObject;
 
-            window.canvas.add(cropRect);
-            window.canvas.setActiveObject(cropRect);
+            // Calculate the actual display dimensions
+            const width = activeObject.getScaledWidth();
+            const height = activeObject.getScaledHeight();
 
-            // Create confirm and cancel buttons
-            this.createCropControls();
+            try {
+                // Create crop overlay - use fabric directly from window
+                const cropRect = new fabric.Rect({
+                    left: activeObject.left,
+                    top: activeObject.top,
+                    width: width,
+                    height: height,
+                    fill: 'rgba(0,0,0,0.3)',
+                    stroke: '#fff',
+                    strokeWidth: 2,
+                    strokeDashArray: [5, 5],
+                    originX: activeObject.originX || 'center',
+                    originY: activeObject.originY || 'center',
+                    name: 'cropOverlay',
+                    cornerColor: 'white',
+                    cornerSize: 10,
+                    transparentCorners: false,
+                    lockRotation: true,
+                    hasRotatingPoint: false
+                });
 
-            // Listen for crop overlay modifications
-            window.canvas.on('object:modified', this.updateCrop.bind(this));
+                // Hide the original image's controls
+                activeObject.hasControls = false;
+                activeObject.selectable = false;
+                activeObject.evented = false;
+
+                window.canvas.add(cropRect);
+                window.canvas.setActiveObject(cropRect);
+                window.canvas.requestRenderAll();
+            } catch (error) {
+                // Reset if there's an error
+                this.cropActive = false;
+            }
         },
 
-        // Create crop confirmation controls
-        createCropControls() {
-            // Create UI elements for crop controls
-            const controlsContainer = document.createElement('div');
-            controlsContainer.id = 'crop-controls';
-            controlsContainer.style = 'position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000;';
-
-            const confirmBtn = document.createElement('button');
-            confirmBtn.textContent = 'Apply Crop';
-            confirmBtn.onclick = this.applyCrop.bind(this);
-
-            const cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.onclick = this.cancelCrop.bind(this);
-
-            controlsContainer.appendChild(confirmBtn);
-            controlsContainer.appendChild(cancelBtn);
-
-            document.body.appendChild(controlsContainer);
-        },
-
-        // Update crop preview based on overlay position
-        updateCrop(e) {
-            if (!this.cropActive) return;
-
-            const cropOverlay = e.target;
-            if (!cropOverlay || cropOverlay.name !== 'cropOverlay') return;
-
-            // TODO: Update crop preview based on overlay
-        },
-
-        // Apply the crop
+// Apply the crop
         applyCrop() {
             if (!window.canvas) return;
 
-            // Get the cropOverlay and the image
-            const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
-            if (!cropOverlay) return;
+            try {
+                // Get the cropOverlay
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (!cropOverlay) return;
 
-            const imageObjects = window.canvas.getObjects().filter(obj => obj.type === 'image');
-            if (imageObjects.length === 0) return;
+                // Get the image to crop
+                const imageObject = this._imageBeingCropped;
+                if (!imageObject) return;
 
-            // Get the image to crop (usually the one beneath the overlay)
-            const imageObject = imageObjects[0];
+                // Get crop dimensions
+                const overlayLeft = cropOverlay.left;
+                const overlayTop = cropOverlay.top;
+                const overlayWidth = cropOverlay.getScaledWidth();
+                const overlayHeight = cropOverlay.getScaledHeight();
 
-            // Calculate crop coordinates
-            // This is a simplified example - actual implementation would need to handle
-            // rotation, scaling, etc. properly
-            const cropX = (cropOverlay.left - imageObject.left) / imageObject.scaleX;
-            const cropY = (cropOverlay.top - imageObject.top) / imageObject.scaleY;
-            const cropWidth = cropOverlay.width / imageObject.scaleX;
-            const cropHeight = cropOverlay.height / imageObject.scaleY;
+                // Get image dimensions
+                const imgLeft = imageObject.left;
+                const imgTop = imageObject.top;
+                const imgScaleX = imageObject.scaleX;
+                const imgScaleY = imageObject.scaleY;
 
-            // Apply cropping to the image
-            imageObject.set({
-                cropX: cropX,
-                cropY: cropY,
-                width: cropWidth,
-                height: cropHeight
-            });
+                // Calculate offset from image center to crop center
+                // This works with the default center origin point
+                const offsetX = overlayLeft - imgLeft;
+                const offsetY = overlayTop - imgTop;
 
-            // Clean up
-            this.cleanupCrop();
+                // Calculate crop parameters in image internal coordinates
+                // These formulas work with center origin points
+                const cropX = (imageObject.width / 2) - (overlayWidth / (2 * imgScaleX)) + (offsetX / imgScaleX);
+                const cropY = (imageObject.height / 2) - (overlayHeight / (2 * imgScaleY)) + (offsetY / imgScaleY);
 
-            // Render changes
-            window.canvas.requestRenderAll();
+                // Apply the crop to the image
+                imageObject.set({
+                    cropX: cropX,
+                    cropY: cropY,
+                    width: overlayWidth / imgScaleX,
+                    height: overlayHeight / imgScaleY
+                });
 
-            // Add to history
-            if (typeof addToHistory === 'function') {
-                addToHistory();
+                // Restore selection abilities
+                imageObject.hasControls = true;
+                imageObject.selectable = true;
+                imageObject.evented = true;
+
+                // Clean up crop overlay
+                window.canvas.remove(cropOverlay);
+
+                // Reset crop state
+                this.cropActive = false;
+
+                // Reselect the image
+                window.canvas.setActiveObject(imageObject);
+                window.canvas.requestRenderAll();
+
+                // Add to history
+                if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                    window.fabricComponent.addToHistory();
+                }
+
+                // Update image in uploads component if it exists
+                if (window.fabricComponent && window.fabricComponent.uploads) {
+                    window.fabricComponent.uploads.selectedObject = imageObject;
+                    window.fabricComponent.uploads.selectedImage = imageObject;
+                    if (typeof window.fabricComponent.uploads.syncObjectProperties === 'function') {
+                        window.fabricComponent.uploads.syncObjectProperties();
+                    }
+                }
+            } catch (error) {
+                // Reset state on error
+                this.cropActive = false;
+
+                // Clean up anyway
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (cropOverlay) {
+                    window.canvas.remove(cropOverlay);
+                }
             }
         },
 
-        // Cancel crop operation
+// Cancel crop operation
         cancelCrop() {
             if (!window.canvas) return;
 
-            // Restore original state if available
-            if (this._originalObjectState) {
-                const imageObjects = window.canvas.getObjects().filter(obj => obj.type === 'image');
-                if (imageObjects.length > 0) {
-                    const imageObject = imageObjects[0];
-                    imageObject.set(this._originalObjectState);
+            try {
+                // Restore original state if available
+                if (this._originalImageState && this._imageBeingCropped) {
+                    this._imageBeingCropped.set(this._originalImageState);
+                    this._imageBeingCropped.hasControls = true;
+                    this._imageBeingCropped.selectable = true;
+                    this._imageBeingCropped.evented = true;
                 }
-            }
 
-            // Clean up
-            this.cleanupCrop();
+                // Remove crop overlay
+                const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
+                if (cropOverlay) {
+                    window.canvas.remove(cropOverlay);
+                }
 
-            // Render changes
-            window.canvas.requestRenderAll();
-        },
+                // Reset state
+                this.cropActive = false;
 
-        // Clean up after crop operation
-        cleanupCrop() {
-            if (!window.canvas) return;
-
-            // Remove crop overlay
-            const cropOverlay = window.canvas.getObjects().find(obj => obj.name === 'cropOverlay');
-            if (cropOverlay) {
-                window.canvas.remove(cropOverlay);
-            }
-
-            // Remove event listener
-            window.canvas.off('object:modified', this.updateCrop);
-
-            // Remove control buttons
-            const controlsContainer = document.getElementById('crop-controls');
-            if (controlsContainer) {
-                controlsContainer.remove();
-            }
-
-            // Reset state
-            this.cropActive = false;
-            this._originalObjectState = null;
-        },
-
-        deleteSelected() {
-            if (!window.canvas) return;
-
-            const activeObject = window.canvas.getActiveObject();
-            if (activeObject) {
-                if (activeObject.type === 'activeSelection') {
-                    // For multiple selected objects
-                    activeObject.forEachObject((obj) => {
-                        window.canvas.remove(obj);
-                    });
-                    // Clear the selection
-                    window.canvas.discardActiveObject();
-                } else {
-                    // For single selected object
-                    window.canvas.remove(activeObject);
+                // Reselect the image
+                if (this._imageBeingCropped) {
+                    window.canvas.setActiveObject(this._imageBeingCropped);
                 }
 
                 window.canvas.requestRenderAll();
-                this.hasSelection = false;
-
-                // Add to history
-                if (typeof addToHistory === 'function') {
-                    addToHistory();
-                }
-
-                // Update layers panel if needed
-                window.dispatchEvent(new CustomEvent('object:removed', {
-                    detail: {object: activeObject}
-                }));
+            } catch (error) {
+                // Reset state on error
+                this.cropActive = false;
             }
+        },
+
+// Reset crop for the toolbar button
+        resetCrop() {
+            this.cancelCrop();
         },
 
         // Group selected objects
@@ -531,7 +548,7 @@ export default function toolbarComponent() {
                 detail: {group}
             }));
         },
-        
+
         // Lock/unlock selected object
         toggleLock() {
             if (!window.canvas) return;
