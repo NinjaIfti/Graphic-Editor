@@ -107,7 +107,7 @@ export default function uploadsComponent() {
                     this.originalImage = img;
                 }
             } catch (error) {
-                // Silent error handling
+                console.log('[UPLOADS] Error storing original image:', error);
             }
         },
 
@@ -146,9 +146,12 @@ export default function uploadsComponent() {
         },
 
         renderUploadedImages() {
+            console.log('[UPLOADS] Rendering uploaded images, count:', this.files.length);
+
             setTimeout(() => {
                 const container = document.getElementById("file-upload-con");
                 if (!container) {
+                    console.warn('[UPLOADS] Upload container not found');
                     return;
                 }
 
@@ -165,9 +168,20 @@ export default function uploadsComponent() {
                     img.src = file.url;
                     img.alt = file.name;
                     img.className = "w-full h-full object-cover cursor-pointer";
+                    img.setAttribute('data-upload-url', file.url);
+                    img.draggable = true;
+
+                    // Add regular click handler
                     img.onclick = () => {
                         this.addImageToCanvas(file.url);
                     };
+
+                    // Add drag start handler for the new mask functionality
+                    img.addEventListener('dragstart', (e) => {
+                        console.log('[UPLOADS] Started dragging image:', file.url);
+                        e.dataTransfer.setData('text/plain', file.url);
+                        e.dataTransfer.effectAllowed = 'copy';
+                    });
 
                     // Create the delete button
                     const deleteBtn = document.createElement("div");
@@ -195,10 +209,14 @@ export default function uploadsComponent() {
                     imgElement.appendChild(deleteBtn);
                     container.appendChild(imgElement);
                 });
+
+                console.log('[UPLOADS] Rendered', this.files.length, 'images in upload panel');
             }, 0);
         },
 
         deleteImage(url) {
+            console.log('[UPLOADS] Deleting image:', url);
+
             // Find the index of the image to delete
             const fileIndex = this.files.findIndex(file => file.url === url);
             const uploadedIndex = this.uploadedItems.findIndex(item => item.url === url);
@@ -223,14 +241,19 @@ export default function uploadsComponent() {
                 this.selectedObject = null;
                 this.selectedImage = null;
             }
+
+            console.log('[UPLOADS] Image deleted, remaining images:', this.files.length);
         },
 
         handleFileUpload(event) {
             const files = event.target.files;
 
             if (!files || files.length === 0) {
+                console.log('[UPLOADS] No files selected');
                 return;
             }
+
+            console.log('[UPLOADS] Processing file upload, files count:', files.length);
 
             // Check if Fabric filters are available
             this.filterAvailable = typeof filters !== "undefined";
@@ -248,12 +271,15 @@ export default function uploadsComponent() {
             Array.from(files).forEach((file, index) => {
                 // Check if the file is an image
                 if (!file.type.match("image.*")) {
+                    console.warn('[UPLOADS] File is not an image:', file.name, file.type);
                     filesProcessed++;
                     if (filesProcessed === totalFiles) {
                         self.renderUploadedImages();
                     }
                     return;
                 }
+
+                console.log('[UPLOADS] Processing image file:', file.name, file.type);
 
                 const reader = new FileReader();
 
@@ -272,6 +298,8 @@ export default function uploadsComponent() {
                         src: imgURL
                     });
 
+                    console.log('[UPLOADS] File loaded:', file.name);
+
                     filesProcessed++;
                     if (filesProcessed === totalFiles) {
                         self.renderUploadedImages();
@@ -279,6 +307,7 @@ export default function uploadsComponent() {
                 };
 
                 reader.onerror = function (error) {
+                    console.error('[UPLOADS] Error reading file:', file.name, error);
                     filesProcessed++;
                     if (filesProcessed === totalFiles) {
                         self.renderUploadedImages();
@@ -287,13 +316,18 @@ export default function uploadsComponent() {
 
                 reader.readAsDataURL(file);
             });
+
+            console.log('[UPLOADS] Started processing', totalFiles, 'files');
         },
 
         addImageToCanvas(url) {
             // Ensure the canvas is initialized
             if (!window.canvas) {
+                console.error('[UPLOADS] Canvas not available for adding image');
                 return;
             }
+
+            console.log('[UPLOADS] Adding image to canvas:', url);
 
             try {
                 const imgElement = new Image();
@@ -304,6 +338,20 @@ export default function uploadsComponent() {
 
                 imgElement.onload = function () {
                     try {
+                        console.log('[UPLOADS] Image loaded, dimensions:', imgElement.width, 'x', imgElement.height);
+
+                        // Check if a mask is selected - if so, apply image to mask instead
+                        if (window.canvas.getActiveObject() &&
+                            window.canvas.getActiveObject().maskType === 'maskContainer' &&
+                            window.masks &&
+                            typeof window.masks.applyImageToMask === 'function') {
+
+                            console.log('[UPLOADS] Mask is selected, applying image to mask');
+                            window.masks.applyImageToMask(window.canvas.getActiveObject(), url);
+                            return;
+                        }
+
+                        // Normal flow - create a fabric image and add to canvas
                         // Create a Fabric.js Image object from the DOM Image using v6 syntax
                         const fabricImage = new FabricImage(imgElement, {
                             left: window.canvas.width / 2,  // Center image
@@ -336,15 +384,21 @@ export default function uploadsComponent() {
 
                         // Let fabric component know image was added
                         window.fabricComponent.addToHistory();
+
+                        console.log('[UPLOADS] Image added to canvas successfully');
                     } catch (error) {
-                        // Silent error handling
+                        console.error('[UPLOADS] Error adding image to canvas:', error);
                     }
+                };
+
+                imgElement.onerror = function(err) {
+                    console.error('[UPLOADS] Failed to load image:', url, err);
                 };
 
                 // Start loading the image
                 imgElement.src = url;
             } catch (e) {
-                // Silent error handling
+                console.error('[UPLOADS] Exception in addImageToCanvas:', e);
             }
         },
 
@@ -630,6 +684,19 @@ export default function uploadsComponent() {
             this.selectedImage = img;
             this.syncObjectProperties();
             this.storeOriginalImage();
+        },
+
+        // Check if an active mask exists and redirect the image to it
+        checkApplyToActiveMask(url) {
+            if (window.canvas && window.masks) {
+                const activeObject = window.canvas.getActiveObject();
+                if (activeObject && activeObject.maskType === 'maskContainer') {
+                    console.log('[UPLOADS] Active mask found, applying image');
+                    window.masks.applyImageToMask(activeObject, url);
+                    return true;
+                }
+            }
+            return false;
         }
     };
 }
