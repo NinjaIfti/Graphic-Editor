@@ -47,20 +47,41 @@ export default function fabricComponent() {
             const objects = window.canvas.getObjects();
             if (objects.length === 0) return;
 
-            const selection = new ActiveSelection(objects, {canvas: window.canvas});
-            const canvasWidth = window.canvas.width;
-            const canvasHeight = window.canvas.height;
-            const selectionWidth = selection.width * selection.scaleX;
-            const selectionHeight = selection.height * selection.scaleY;
-            const scaleX = (canvasWidth - 40) / selectionWidth;
-            const scaleY = (canvasHeight - 40) / selectionHeight;
-            const scale = Math.min(scaleX, scaleY);
-
-            selection.scale(scale);
-            selection.center();
-            window.canvas.discardActiveObject();
-            this.addToHistory();
-            window.canvas.requestRenderAll();
+            try {
+                // Create a selection of all objects
+                const selection = new ActiveSelection(objects, {canvas: window.canvas});
+                const canvasWidth = window.canvas.width;
+                const canvasHeight = window.canvas.height;
+                const selectionWidth = selection.width * selection.scaleX;
+                const selectionHeight = selection.height * selection.scaleY;
+                const scaleX = (canvasWidth - 40) / selectionWidth;
+                const scaleY = (canvasHeight - 40) / selectionHeight;
+                const scale = Math.min(scaleX, scaleY);
+                
+                // Apply scaling
+                selection.scale(scale);
+                
+                // Center the selection manually (instead of using selection.center())
+                const selectionCenter = selection.getCenterPoint();
+                const canvasCenter = { x: canvasWidth / 2, y: canvasHeight / 2 };
+                
+                // Calculate the offset needed to center
+                const offsetX = canvasCenter.x - selectionCenter.x;
+                const offsetY = canvasCenter.y - selectionCenter.y;
+                
+                // Move the selection to center
+                selection.left += offsetX;
+                selection.top += offsetY;
+                selection.setCoords();
+                
+                // Apply the changes to the canvas
+                window.canvas.setActiveObject(selection);
+                window.canvas.discardActiveObject();
+                this.addToHistory();
+                window.canvas.requestRenderAll();
+            } catch (error) {
+                console.error("Error in fitToCanvas:", error);
+            }
         },
 
         clearCanvas() {
@@ -78,17 +99,39 @@ export default function fabricComponent() {
             const activeObject = window.canvas.getActiveObject();
             if (!activeObject) return;
 
+            console.log(`[DEBUG] Alignment requested: direction=${direction}, objectType=${activeObject.type}`);
+
+            // Reset objectCaching to ensure alignment changes always take effect
+            // This is crucial for text objects that might have their state cached
+            activeObject.set('objectCaching', false);
+            
             // Case 1: Single object - align relative to canvas
             if (activeObject.type !== 'activeSelection' && activeObject.type !== 'group') {
+                console.log(`[DEBUG] Aligning single object: ${activeObject.type}`);
                 this.alignSingleObject(activeObject, direction);
             }
             // Case 2: Multiple objects - align relative to each other
             else {
+                console.log(`[DEBUG] Aligning multiple objects: count=${activeObject.getObjects().length}`);
                 this.alignMultipleObjects(activeObject, direction);
             }
-
+            
+            // Force dirty state to ensure canvas updates
+            if (activeObject.type && (activeObject.type.includes('text') || activeObject.type === 'textbox')) {
+                console.log(`[DEBUG] Setting dirty state for text object`);
+                activeObject.dirty = true;
+            }
+            
+            // Ensure coordinates are properly updated
+            activeObject.setCoords();
+            
+            // Force a complete canvas re-render
             window.canvas.requestRenderAll();
+            
+            // Add to history to track the change
             this.addToHistory();
+            
+            console.log(`[DEBUG] Alignment completed for ${direction}`);
         },
 
         // aligning a single object to the canvas
@@ -98,6 +141,14 @@ export default function fabricComponent() {
             const objectWidth = object.width * object.scaleX;
             const objectHeight = object.height * object.scaleY;
 
+            // Store original values in case needed for debugging
+            const originalLeft = object.left;
+            const originalTop = object.top;
+            const originalTextAlign = object.type.includes('text') ? object.textAlign : 'N/A';
+
+            console.log(`[DEBUG] Before alignment: left=${originalLeft.toFixed(2)}, top=${originalTop.toFixed(2)}, textAlign=${originalTextAlign}`);
+
+            // First handle positioning
             switch (direction) {
                 case "left":
                     object.set({left: objectWidth / 2});
@@ -121,17 +172,60 @@ export default function fabricComponent() {
                     break;
             }
 
+            // Special handling for text objects (Textbox or text type objects)
+            if (object.type && (object.type.includes('text') || object.type === 'textbox')) {
+                // Handle internal text alignment separately from positioning
+                if (direction === "left") {
+                    // Force text to be left aligned within its bounding box
+                    console.log(`[DEBUG] Setting textAlign to left from ${object.textAlign}`);
+                    object.set('textAlign', 'left');
+                    
+                    // Make sure the object has the right origin point
+                    object.set('originX', 'left');
+                } 
+                else if (direction === "horizontalCenter" || direction === "centerH") {
+                    // Force text to be center aligned within its bounding box
+                    console.log(`[DEBUG] Setting textAlign to center from ${object.textAlign}`);
+                    object.set('textAlign', 'center');
+                    
+                    // Make sure the object has the right origin point
+                    object.set('originX', 'center');
+                } 
+                else if (direction === "right") {
+                    // Force text to be right aligned within its bounding box
+                    console.log(`[DEBUG] Setting textAlign to right from ${object.textAlign}`);
+                    object.set('textAlign', 'right');
+                    
+                    // Make sure the object has the right origin point
+                    object.set('originX', 'right');
+                }
+                
+                // Force complete refresh of the object
+                object.dirty = true;
+                
+                // Apply text alignment directly to ensure it works
+                if (typeof object._applyTextStyleDimensions === 'function') {
+                    object._applyTextStyleDimensions();
+                }
+            }
+
+            // Always update coordinates
             object.setCoords();
+            
+            console.log(`[DEBUG] After alignment: left=${object.left.toFixed(2)}, top=${object.top.toFixed(2)}, textAlign=${object.type.includes('text') ? object.textAlign : 'N/A'}, originX=${object.originX}`);
         },
 
 // aligning multiple objects relative to each other
         alignMultipleObjects(activeSelection, direction) {
+            console.log(`[DEBUG] Starting multiple object alignment for direction: ${direction}`);
+            
             // Get all objects in the selection
             const objects = activeSelection.getObjects();
             if (objects.length <= 1) return; // Nothing to align if only one object
 
             // Find the bounds of the selection
             const selectionBounds = activeSelection.getBoundingRect(true);
+            console.log(`[DEBUG] Selection bounds: left=${selectionBounds.left.toFixed(2)}, top=${selectionBounds.top.toFixed(2)}, width=${selectionBounds.width.toFixed(2)}, height=${selectionBounds.height.toFixed(2)}`);
 
             switch (direction) {
                 case "left":
@@ -141,13 +235,16 @@ export default function fabricComponent() {
                         const boundingRect = obj.getBoundingRect(true);
                         minLeft = Math.min(minLeft, boundingRect.left);
                     });
+                    console.log(`[DEBUG] Found minimum left: ${minLeft.toFixed(2)}`);
 
                     objects.forEach(obj => {
                         const boundingRect = obj.getBoundingRect(true);
                         const objWidth = boundingRect.width;
+                        const oldLeft = obj.left;
                         obj.set({
                             left: obj.left + (minLeft - boundingRect.left) + (objWidth / 2) - (obj.width * obj.scaleX / 2)
                         });
+                        console.log(`[DEBUG] Moving object from left=${oldLeft.toFixed(2)} to left=${obj.left.toFixed(2)}`);
                     });
                     break;
 
@@ -155,10 +252,14 @@ export default function fabricComponent() {
                 case "centerH":
                     // Align all objects to horizontal center of selection
                     const selectionCenterX = selectionBounds.left + selectionBounds.width / 2;
+                    console.log(`[DEBUG] Selection center X: ${selectionCenterX.toFixed(2)}`);
+                    
                     objects.forEach(obj => {
+                        const oldLeft = obj.left;
                         obj.set({
                             left: obj.left + (selectionCenterX - (obj.left + (obj.width * obj.scaleX / 2)))
                         });
+                        console.log(`[DEBUG] Moving object from left=${oldLeft.toFixed(2)} to left=${obj.left.toFixed(2)}`);
                     });
                     break;
 
@@ -169,13 +270,16 @@ export default function fabricComponent() {
                         const boundingRect = obj.getBoundingRect(true);
                         maxRight = Math.max(maxRight, boundingRect.left + boundingRect.width);
                     });
+                    console.log(`[DEBUG] Found maximum right: ${maxRight.toFixed(2)}`);
 
                     objects.forEach(obj => {
                         const boundingRect = obj.getBoundingRect(true);
                         const objWidth = boundingRect.width;
+                        const oldLeft = obj.left;
                         obj.set({
                             left: obj.left + (maxRight - (boundingRect.left + boundingRect.width)) + (obj.width * obj.scaleX / 2) - (objWidth / 2)
                         });
+                        console.log(`[DEBUG] Moving object from left=${oldLeft.toFixed(2)} to left=${obj.left.toFixed(2)}`);
                     });
                     break;
 
@@ -227,6 +331,7 @@ export default function fabricComponent() {
 
             // Need to call this after modifying objects within a selection
             activeSelection.setCoords();
+            console.log(`[DEBUG] Multiple object alignment completed for direction: ${direction}`);
         },
 
         group() {
@@ -412,6 +517,8 @@ export default function fabricComponent() {
                 this.initCanvas();
                 this.initHistoryManager();
                 this.initKeyboardShortcuts();
+                // Fix for quick options bar alignment
+                this.patchQuickOptionsBarAlignment();
                 // Initialize context menu
                 if (this.contextMenu && typeof this.contextMenu.init === 'function') {
                     this.contextMenu.init();
@@ -434,6 +541,100 @@ export default function fabricComponent() {
             this.$watch("activeTool", (value) => {
                 this.activeTool = value;
             });
+        },
+
+        // Patch for quick options bar alignment functionality
+        patchQuickOptionsBarAlignment() {
+            try {
+                // This patches the minified Ko function that handles alignment
+                window.fixAlignment = function(type, object) {
+                    console.log("[DEBUG] Quick options bar alignment called:", type);
+                    
+                    if (!object || !window.canvas) return false;
+                    
+                    // Store object state before alignment for debug
+                    const originalLeft = object.left;
+                    const originalTop = object.top;
+                    const canvasWidth = window.canvas.width;
+                    const canvasHeight = window.canvas.height;
+                    
+                    // Disable object caching to ensure changes take effect
+                    object.set('objectCaching', false);
+                    
+                    // Handle different alignment types
+                    switch (type) {
+                        case "left":
+                            object.set({left: 0});
+                            break;
+                        case "right":
+                            object.set({left: canvasWidth - object.getScaledWidth()});
+                            break;
+                        case "centerH":
+                            object.set({left: canvasWidth / 2});
+                            break;
+                        case "top":
+                            object.set({top: 0});
+                            break;
+                        case "bottom":
+                            object.set({top: canvasHeight - object.getScaledHeight()});
+                            break;
+                        case "centerV":
+                            object.set({top: canvasHeight / 2});
+                            break;
+                    }
+                    
+                    // Special handling for text objects to update textAlign if needed
+                    if (object.type && (object.type.includes('text') || object.type === 'textbox')) {
+                        if (type === "left") {
+                            object.set('textAlign', 'left');
+                            object.set('originX', 'left');
+                        } else if (type === "centerH") {
+                            object.set('textAlign', 'center');
+                            object.set('originX', 'center');
+                        } else if (type === "right") {
+                            object.set('textAlign', 'right');
+                            object.set('originX', 'right');
+                        }
+                        
+                        // Force dirty state to ensure rendering
+                        object.dirty = true;
+                    }
+                    
+                    // Update coordinates and render
+                    object.setCoords();
+                    window.canvas.requestRenderAll();
+                    
+                    console.log(`[DEBUG] Aligned object from left=${originalLeft.toFixed(2)}, top=${originalTop.toFixed(2)} to left=${object.left.toFixed(2)}, top=${object.top.toFixed(2)}`);
+                    return true;
+                };
+                
+                // Patch the page's click event for alignment buttons 
+                if (typeof jQuery !== 'undefined') {
+                    jQuery(document).off('click', '.quick-options-bar .alignment-btns .single-tool');
+                    jQuery(document).on('click', '.quick-options-bar .alignment-btns .single-tool', function() {
+                        let activeObject = window.canvas.getActiveObject();
+                        let alignType = jQuery(this).attr('data-type') || jQuery(this).data('type');
+                        
+                        if (!activeObject) return false;
+                        
+                        // Call our fixed alignment function instead of Ko
+                        window.fixAlignment(alignType, activeObject);
+                        
+                        // Make sure the object is selected and canvas is updated
+                        window.canvas.setActiveObject(activeObject);
+                        window.canvas.requestRenderAll();
+                        
+                        // Add to history if possible
+                        if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
+                            window.fabricComponent.addToHistory();
+                        }
+                    });
+                    
+                    console.log("[DEBUG] Quick options bar alignment patch applied");
+                }
+            } catch (error) {
+                console.error("Error patching quick options bar alignment:", error);
+            }
         },
 
         // Change tool method
@@ -515,10 +716,32 @@ export default function fabricComponent() {
                     // Re-center all objects
                     const objects = canvas.getObjects();
                     if (objects.length > 0) {
-                        const selection = new fabric.ActiveSelection(objects, {canvas: canvas});
-                        selection.center();
-                        canvas.discardActiveObject();
-                        canvas.requestRenderAll();
+                        try {
+                            // Create a temporary active selection with all objects
+                            const selection = new fabric.ActiveSelection(objects, {canvas: canvas});
+                            
+                            // Get current center of the selection
+                            const selectionCenter = selection.getCenterPoint();
+                            
+                            // Get the new canvas center
+                            const canvasCenter = { x: newWidth / 2, y: newHeight / 2 };
+                            
+                            // Calculate the offset needed to center
+                            const offsetX = canvasCenter.x - selectionCenter.x;
+                            const offsetY = canvasCenter.y - selectionCenter.y;
+                            
+                            // Move the selection to center
+                            selection.left += offsetX;
+                            selection.top += offsetY;
+                            selection.setCoords();
+                            
+                            // Apply the changes to the canvas
+                            canvas.setActiveObject(selection);
+                            canvas.discardActiveObject();
+                            canvas.requestRenderAll();
+                        } catch (error) {
+                            console.error("Error centering objects on resize:", error);
+                        }
                     }
                 });
 

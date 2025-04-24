@@ -75,163 +75,133 @@ export default function toolbarComponent() {
             }));
         },
 
-        // alignment function
         alignObjects(type) {
             if (!window.canvas) return;
-
+        
             const activeObject = window.canvas.getActiveObject();
             if (!activeObject) return;
-
-            // Check if we have a single object or multiple objects - fixed case sensitivity
+        
+            // Check if we have a single object or multiple objects
             const isMultipleSelection = (activeObject.type === 'activeselection' || activeObject.type === 'group');
-
+        
             if (!isMultipleSelection) {
                 // CASE 1: Single object - align relative to the canvas
+                // (Your existing code for single objects is fine)
                 const canvasWidth = window.canvas.width;
                 const canvasHeight = window.canvas.height;
                 const objectWidth = activeObject.getScaledWidth();
                 const objectHeight = activeObject.getScaledHeight();
-
+        
                 switch (type) {
                     case 'left':
-                        activeObject.set({
-                            left: 0
-                        });
+                        activeObject.set({ left: 0 });
                         break;
                     case 'centerH':
-                        activeObject.set({
-                            left: (canvasWidth / 2) - (objectWidth / 2)
-                        });
+                        activeObject.set({ left: (canvasWidth / 2) - (objectWidth / 2) });
                         break;
                     case 'right':
-                        activeObject.set({
-                            left: canvasWidth - objectWidth
-                        });
+                        activeObject.set({ left: canvasWidth - objectWidth });
                         break;
                     case 'top':
-                        activeObject.set({
-                            top: 0
-                        });
+                        activeObject.set({ top: 0 });
                         break;
                     case 'centerV':
-                        activeObject.set({
-                            top: (canvasHeight / 2) - (objectHeight / 2)
-                        });
+                        activeObject.set({ top: (canvasHeight / 2) - (objectHeight / 2) });
                         break;
                     case 'bottom':
-                        activeObject.set({
-                            top: canvasHeight - objectHeight
-                        });
+                        activeObject.set({ top: canvasHeight - objectHeight });
                         break;
                 }
             } else {
-                // Get all the objects in the selection
+                // CASE 2: Multiple objects - align relative to each other
                 const objects = activeObject.getObjects();
-                if (objects.length <= 1) return; // Nothing to align with just one object
-
+                if (objects.length <= 1) return;
+        
                 // Remember the original position of the group
                 const originalLeft = activeObject.left;
                 const originalTop = activeObject.top;
-
-                // For horizontal alignment, we need special handling
-                if (type === 'left' || type === 'centerH' || type === 'right') {
-                    // Find leftmost and rightmost objects in the selection
-                    let minLeft = Infinity;
-                    let maxRight = -Infinity;
-
-                    objects.forEach(obj => {
-                        // Get local coordinates inside the group
-                        const left = obj.left;
-                        const right = left + (obj.width * obj.scaleX);
-
-                        minLeft = Math.min(minLeft, left);
-                        maxRight = Math.max(maxRight, right);
-                    });
-
-                    const selectionWidth = maxRight - minLeft;
-                    const selectionCenter = minLeft + selectionWidth / 2;
-
-                    // Apply alignment directly based on object's position within the group
-                    objects.forEach(obj => {
-                        const objWidth = obj.width * obj.scaleX;
-
-                        switch (type) {
-                            case 'left':
-                                // Align all objects to the left edge
-                                obj.set('left', minLeft);
-                                break;
-
-                            case 'centerH':
-                                // Align all objects to horizontal center
-                                obj.set('left', selectionCenter - (objWidth / 2));
-                                break;
-
-                            case 'right':
-                                // Align all objects to right edge
-                                obj.set('left', maxRight - objWidth);
-                                break;
-                        }
-                    });
-                } else {
-                    // Vertical alignment - existing code that's working
-                    // Get the bounding box
-                    const boundingBox = activeObject.getBoundingRect(true);
-
-                    // Calculate important points of the bounding box
-                    const boxTop = boundingBox.top;
-                    const boxHeight = boundingBox.height;
-                    const boxBottom = boxTop + boxHeight;
-                    const boxCenterY = boxTop + (boxHeight / 2);
-
-                    // For each object, calculate new position based on the bounding box
-                    objects.forEach(obj => {
-                        // Get object's actual bounding rectangle
-                        const objBounds = obj.getBoundingRect(true);
-                        const objHeight = objBounds.height;
-
-                        // Calculate current positions
-                        const objTop = objBounds.top;
-                        const objBottom = objTop + objHeight;
-                        const objCenterY = objTop + (objHeight / 2);
-
-                        // Calculate needed position change
-                        let deltaY = 0;
-
-                        switch (type) {
-                            case 'top':
-                                // Align to top edge of bounding box
-                                deltaY = boxTop - objTop;
-                                break;
-                            case 'centerV':
-                                // Align to vertical center of bounding box
-                                deltaY = boxCenterY - objCenterY;
-                                break;
-                            case 'bottom':
-                                // Align to bottom edge of bounding box
-                                deltaY = boxBottom - objBottom;
-                                break;
-                        }
-
-                        // Apply the position change to the object
-                        if (deltaY !== 0) {
-                            obj.set('top', obj.top + deltaY);
-                        }
-                    });
-                }
-
+        
+                // Get the bounding box of the entire selection
+                const boundingBox = activeObject.getBoundingRect(true);
+                
+                // Calculate important points of the bounding box
+                const boxLeft = boundingBox.left;
+                const boxTop = boundingBox.top;
+                const boxWidth = boundingBox.width;
+                const boxHeight = boundingBox.height;
+                const boxRight = boxLeft + boxWidth;
+                const boxBottom = boxTop + boxHeight;
+                const boxCenterX = boxLeft + (boxWidth / 2);
+                const boxCenterY = boxTop + (boxHeight / 2);
+        
+                // For each object, calculate new position based on the bounding box
+                objects.forEach(obj => {
+                    // Get object's actual bounding rectangle
+                    const objBounds = obj.getBoundingRect(true);
+                    const objWidth = objBounds.width;
+                    const objHeight = objBounds.height;
+        
+                    // Calculate current positions
+                    const objLeft = objBounds.left;
+                    const objTop = objBounds.top;
+                    const objRight = objLeft + objWidth;
+                    const objBottom = objTop + objHeight;
+                    const objCenterX = objLeft + (objWidth / 2);
+                    const objCenterY = objTop + (objHeight / 2);
+        
+                    // Calculate needed position change
+                    let deltaX = 0;
+                    let deltaY = 0;
+        
+                    switch (type) {
+                        case 'left':
+                            // Align to left edge of bounding box
+                            deltaX = boxLeft - objLeft;
+                            break;
+                        case 'centerH':
+                            // Align to horizontal center of bounding box
+                            deltaX = boxCenterX - objCenterX;
+                            break;
+                        case 'right':
+                            // Align to right edge of bounding box
+                            deltaX = boxRight - objRight;
+                            break;
+                        case 'top':
+                            // Align to top edge of bounding box
+                            deltaY = boxTop - objTop;
+                            break;
+                        case 'centerV':
+                            // Align to vertical center of bounding box
+                            deltaY = boxCenterY - objCenterY;
+                            break;
+                        case 'bottom':
+                            // Align to bottom edge of bounding box
+                            deltaY = boxBottom - objBottom;
+                            break;
+                    }
+        
+                    // Apply the position change to the object
+                    if (deltaX !== 0) {
+                        obj.set('left', obj.left + deltaX);
+                    }
+                    if (deltaY !== 0) {
+                        obj.set('top', obj.top + deltaY);
+                    }
+                });
+        
                 // Make sure the group doesn't move
                 activeObject.set({
                     left: originalLeft,
                     top: originalTop
                 });
             }
-
+        
             // Update object coordinates
             activeObject.setCoords();
-
+        
             // Update canvas
             window.canvas.requestRenderAll();
-
+        
             // Add to history
             if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
                 window.fabricComponent.addToHistory();
