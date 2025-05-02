@@ -5,12 +5,12 @@
 [x-cloak] {
     display: none !important;
 }
+
 .background-image {
     background-image: radial-gradient(#333 8%, transparent 8%);
     background-size: 20px 20px;
     background-color: #000;
 }
-
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .scrollbar-hide::-webkit-scrollbar {
@@ -23,7 +23,43 @@
     scrollbar-width: none;  /* Firefox */
 }
 
-#image-editor {
-    -webkit-user-drag: element;
-    aspect-ratio: auto 1257 / 798;
+/* Fixed layout for canvas and sidebar scrolling */
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
 }
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Navbar */
+.bg-white.border-b {
+    flex-shrink: 0; /* Prevent navbar from shrinking */
+}
+
+
+
+
+/* Mini bar */
+.bg-white.flex.flex-col.max-w-\[90px\] {
+    height: 100%;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+/* Panel container */
+.min-w-\[335px\].max-w-\[335px\].h-full {
+    height: 100%;
+    overflow-y: auto; /* Allow panel to scroll independently */
+    flex-shrink: 0; /* Prevent panel from shrinking */
+}
+
+
+
+
+
+

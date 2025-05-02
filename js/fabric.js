@@ -20,7 +20,12 @@ import settingsComponent from "./components/settings";
 import toolbarComponent from "./components/toolbar";
 import contextMenuComponent from "./components/contextMenu";
 import {downloadJPG, downloadPNG} from "./utils/export-utils";
-
+import {
+    initHistoryManager,
+    addToHistory as addHistoryState,
+    undo as undoHistory,
+    redo as redoHistory
+} from "./utils/history-manager";
 // Create the unified fabric component
 export default function fabricComponent() {
 
@@ -57,23 +62,23 @@ export default function fabricComponent() {
                 const scaleX = (canvasWidth - 40) / selectionWidth;
                 const scaleY = (canvasHeight - 40) / selectionHeight;
                 const scale = Math.min(scaleX, scaleY);
-                
+
                 // Apply scaling
                 selection.scale(scale);
-                
+
                 // Center the selection manually (instead of using selection.center())
                 const selectionCenter = selection.getCenterPoint();
-                const canvasCenter = { x: canvasWidth / 2, y: canvasHeight / 2 };
-                
+                const canvasCenter = {x: canvasWidth / 2, y: canvasHeight / 2};
+
                 // Calculate the offset needed to center
                 const offsetX = canvasCenter.x - selectionCenter.x;
                 const offsetY = canvasCenter.y - selectionCenter.y;
-                
+
                 // Move the selection to center
                 selection.left += offsetX;
                 selection.top += offsetY;
                 selection.setCoords();
-                
+
                 // Apply the changes to the canvas
                 window.canvas.setActiveObject(selection);
                 window.canvas.discardActiveObject();
@@ -104,7 +109,7 @@ export default function fabricComponent() {
             // Reset objectCaching to ensure alignment changes always take effect
             // This is crucial for text objects that might have their state cached
             activeObject.set('objectCaching', false);
-            
+
             // Case 1: Single object - align relative to canvas
             if (activeObject.type !== 'activeSelection' && activeObject.type !== 'group') {
                 console.log(`[DEBUG] Aligning single object: ${activeObject.type}`);
@@ -115,22 +120,22 @@ export default function fabricComponent() {
                 console.log(`[DEBUG] Aligning multiple objects: count=${activeObject.getObjects().length}`);
                 this.alignMultipleObjects(activeObject, direction);
             }
-            
+
             // Force dirty state to ensure canvas updates
             if (activeObject.type && (activeObject.type.includes('text') || activeObject.type === 'textbox')) {
                 console.log(`[DEBUG] Setting dirty state for text object`);
                 activeObject.dirty = true;
             }
-            
+
             // Ensure coordinates are properly updated
             activeObject.setCoords();
-            
+
             // Force a complete canvas re-render
             window.canvas.requestRenderAll();
-            
+
             // Add to history to track the change
             this.addToHistory();
-            
+
             console.log(`[DEBUG] Alignment completed for ${direction}`);
         },
 
@@ -179,30 +184,28 @@ export default function fabricComponent() {
                     // Force text to be left aligned within its bounding box
                     console.log(`[DEBUG] Setting textAlign to left from ${object.textAlign}`);
                     object.set('textAlign', 'left');
-                    
+
                     // Make sure the object has the right origin point
                     object.set('originX', 'left');
-                } 
-                else if (direction === "horizontalCenter" || direction === "centerH") {
+                } else if (direction === "horizontalCenter" || direction === "centerH") {
                     // Force text to be center aligned within its bounding box
                     console.log(`[DEBUG] Setting textAlign to center from ${object.textAlign}`);
                     object.set('textAlign', 'center');
-                    
+
                     // Make sure the object has the right origin point
                     object.set('originX', 'center');
-                } 
-                else if (direction === "right") {
+                } else if (direction === "right") {
                     // Force text to be right aligned within its bounding box
                     console.log(`[DEBUG] Setting textAlign to right from ${object.textAlign}`);
                     object.set('textAlign', 'right');
-                    
+
                     // Make sure the object has the right origin point
                     object.set('originX', 'right');
                 }
-                
+
                 // Force complete refresh of the object
                 object.dirty = true;
-                
+
                 // Apply text alignment directly to ensure it works
                 if (typeof object._applyTextStyleDimensions === 'function') {
                     object._applyTextStyleDimensions();
@@ -211,14 +214,14 @@ export default function fabricComponent() {
 
             // Always update coordinates
             object.setCoords();
-            
+
             console.log(`[DEBUG] After alignment: left=${object.left.toFixed(2)}, top=${object.top.toFixed(2)}, textAlign=${object.type.includes('text') ? object.textAlign : 'N/A'}, originX=${object.originX}`);
         },
 
 // aligning multiple objects relative to each other
         alignMultipleObjects(activeSelection, direction) {
             console.log(`[DEBUG] Starting multiple object alignment for direction: ${direction}`);
-            
+
             // Get all objects in the selection
             const objects = activeSelection.getObjects();
             if (objects.length <= 1) return; // Nothing to align if only one object
@@ -253,7 +256,7 @@ export default function fabricComponent() {
                     // Align all objects to horizontal center of selection
                     const selectionCenterX = selectionBounds.left + selectionBounds.width / 2;
                     console.log(`[DEBUG] Selection center X: ${selectionCenterX.toFixed(2)}`);
-                    
+
                     objects.forEach(obj => {
                         const oldLeft = obj.left;
                         obj.set({
@@ -473,21 +476,15 @@ export default function fabricComponent() {
         },
 
         addToHistory() {
-            this.saveCanvasState();
+            addHistoryState();
         },
 
         undo() {
-            if (this.historyPosition > 0) {
-                this.historyPosition--;
-                this.loadCanvasState(this.historyStack[this.historyPosition]);
-            }
+            undoHistory();
         },
 
         redo() {
-            if (this.historyPosition < this.historyStack.length - 1) {
-                this.historyPosition++;
-                this.loadCanvasState(this.historyStack[this.historyPosition]);
-            }
+            redoHistory();
         },
 
         loadCanvasState(state) {
@@ -514,26 +511,50 @@ export default function fabricComponent() {
         // Main component initialization
         init() {
             this.$nextTick(() => {
+                // Initialize the canvas first - this creates window.canvas
                 this.initCanvas();
-                this.initHistoryManager();
+
+                // Initialize the history manager
+                initHistoryManager();
+
+                // Set up responsive resizing after canvas initialization
+                if (this.settings && typeof this.settings.setupResponsiveResizing === 'function') {
+                    this.settings.setupResponsiveResizing();
+                }
+
+                // Dimension tracking for exports
+                if (typeof this.initDimensionTracking === 'function') {
+                    this.initDimensionTracking();
+                }
+
+                // Set up event listeners only after canvas is initialized
+                this.setupCanvasEventListeners();
+
+                // Initialize keyboard shortcuts for all functions
                 this.initKeyboardShortcuts();
+
                 // Fix for quick options bar alignment
                 this.patchQuickOptionsBarAlignment();
+
                 // Initialize context menu
                 if (this.contextMenu && typeof this.contextMenu.init === 'function') {
                     this.contextMenu.init();
                 }
-                   // Initialize masks component
+
+                // Initialize masks component
                 if (this.masks && typeof this.masks.init === 'function') {
                     this.masks.init();
                 }
+
                 if (this.layers && typeof this.layers.init === 'function') {
                     this.layers.init();
                 }
+
                 // Initialize other components as needed
                 if (this.uploads && typeof this.uploads.init === 'function') {
                     this.uploads.init();
                 }
+
                 // Keep this important log for initialization verification
                 console.log("Canvas initialized:", !!window.canvas);
             });
@@ -543,24 +564,62 @@ export default function fabricComponent() {
             });
         },
 
+        setupCanvasEventListeners() {
+            // Make sure canvas exists before adding event listeners
+            if (!window.canvas) {
+                console.error("Cannot setup canvas event listeners: canvas is undefined");
+                return;
+            }
+
+            // Now it's safe to add the event listeners
+            window.canvas.on('object:added', function(e) {
+                const obj = e.target;
+
+                // Mark all objects as "don't scale me"
+                obj._noScale = true;
+
+                // If it's an image, ensure it's displayed at its natural size
+                if (obj.type === 'image' && !obj._naturalSizeSet) {
+                    const imgElement = obj._element;
+                    if (imgElement) {
+                        // Calculate the scale to show at natural size
+                        const naturalScaleX = imgElement.naturalWidth / obj.width;
+                        const naturalScaleY = imgElement.naturalHeight / obj.height;
+
+                        // Apply the natural size scaling
+                        obj.set({
+                            scaleX: naturalScaleX,
+                            scaleY: naturalScaleY,
+                            _naturalSizeSet: true
+                        });
+
+                        // Update coordinates
+                        obj.setCoords();
+                        window.canvas.requestRenderAll();
+                    }
+                }
+            });
+
+            console.log("Canvas event listeners successfully initialized");
+        },
         // Patch for quick options bar alignment functionality
         patchQuickOptionsBarAlignment() {
             try {
                 // This patches the minified Ko function that handles alignment
-                window.fixAlignment = function(type, object) {
+                window.fixAlignment = function (type, object) {
                     console.log("[DEBUG] Quick options bar alignment called:", type);
-                    
+
                     if (!object || !window.canvas) return false;
-                    
+
                     // Store object state before alignment for debug
                     const originalLeft = object.left;
                     const originalTop = object.top;
                     const canvasWidth = window.canvas.width;
                     const canvasHeight = window.canvas.height;
-                    
+
                     // Disable object caching to ensure changes take effect
                     object.set('objectCaching', false);
-                    
+
                     // Handle different alignment types
                     switch (type) {
                         case "left":
@@ -582,7 +641,7 @@ export default function fabricComponent() {
                             object.set({top: canvasHeight / 2});
                             break;
                     }
-                    
+
                     // Special handling for text objects to update textAlign if needed
                     if (object.type && (object.type.includes('text') || object.type === 'textbox')) {
                         if (type === "left") {
@@ -595,41 +654,41 @@ export default function fabricComponent() {
                             object.set('textAlign', 'right');
                             object.set('originX', 'right');
                         }
-                        
+
                         // Force dirty state to ensure rendering
                         object.dirty = true;
                     }
-                    
+
                     // Update coordinates and render
                     object.setCoords();
                     window.canvas.requestRenderAll();
-                    
+
                     console.log(`[DEBUG] Aligned object from left=${originalLeft.toFixed(2)}, top=${originalTop.toFixed(2)} to left=${object.left.toFixed(2)}, top=${object.top.toFixed(2)}`);
                     return true;
                 };
-                
+
                 // Patch the page's click event for alignment buttons 
                 if (typeof jQuery !== 'undefined') {
                     jQuery(document).off('click', '.quick-options-bar .alignment-btns .single-tool');
-                    jQuery(document).on('click', '.quick-options-bar .alignment-btns .single-tool', function() {
+                    jQuery(document).on('click', '.quick-options-bar .alignment-btns .single-tool', function () {
                         let activeObject = window.canvas.getActiveObject();
                         let alignType = jQuery(this).attr('data-type') || jQuery(this).data('type');
-                        
+
                         if (!activeObject) return false;
-                        
+
                         // Call our fixed alignment function instead of Ko
                         window.fixAlignment(alignType, activeObject);
-                        
+
                         // Make sure the object is selected and canvas is updated
                         window.canvas.setActiveObject(activeObject);
                         window.canvas.requestRenderAll();
-                        
+
                         // Add to history if possible
                         if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
                             window.fabricComponent.addToHistory();
                         }
                     });
-                    
+
                     console.log("[DEBUG] Quick options bar alignment patch applied");
                 }
             } catch (error) {
@@ -653,114 +712,70 @@ export default function fabricComponent() {
             }
         },
 
+        // Update the initCanvas method in fabricComponent.js
         initCanvas() {
             try {
                 // Get the canvas container element
                 const canvasContainer = document.getElementById('canvas-container');
+                if (!canvasContainer) {
+                    console.error("Canvas container not found");
+                    return;
+                }
 
-                // Default 1080p resolution
+                // Default resolution for internal canvas (high quality exports)
                 const defaultWidth = 1920;
                 const defaultHeight = 1080;
 
-                // Determine the container size (max width of 1200px, height of 660px)
-                const containerWidth = canvasContainer.clientWidth;
-                const containerHeight = canvasContainer.clientHeight;
+                // Store export dimensions
+                this.exportWidth = defaultWidth;
+                this.exportHeight = defaultHeight;
 
-                // Set the canvas width and height based on container size
-                const width = Math.min(defaultWidth, containerWidth);
-                const height = Math.min(defaultHeight, containerHeight);
-
-                // Create canvas with 1080p or container size
+                // Create canvas with high-resolution for exports
                 const canvas = new fabric.Canvas("image-editor", {
                     preserveObjectStacking: true,
-                    width: width,
-                    height: height,
+                    width: defaultWidth,
+                    height: defaultHeight,
                     backgroundColor: "#ffffff",
                     enableRetinaScaling: true,
                     renderOnAddRemove: false,
-                    selection: true, // Enable multiple selection by default
-                    selectionBorderColor: 'blue', // Optional: Selection border color
-                    selectionColor: 'rgba(0, 0, 255, 0.3)', // Selection area color (light blue)
-                    selectionLineWidth: 2, // Line width of the selection border
+                    selection: true,
+                    selectionBorderColor: 'blue',
+                    selectionColor: 'rgba(0, 0, 255, 0.3)',
+                    selectionLineWidth: 2,
                 });
 
                 // Store canvas reference globally and in Alpine state
                 window.canvas = canvas;
                 this.canvas = canvas;
-
-                // Make this component accessible globally for child components
                 window.fabricComponent = this;
 
-                // Enable multi-selection via Shift or Ctrl (Cmd) key
+                // Initialize settings component if not already initialized
+                if (this.settings && typeof this.settings.init === 'function') {
+                    // Settings will handle responsive resizing
+                    console.log('Settings component will handle responsive sizing');
+                } else {
+                    // Use the settings component directly if available, or fallback
+                    if (this.settings && typeof this.settings.setupResponsiveResizing === 'function') {
+                        console.log('Using settings.setupResponsiveResizing()');
+                        this.settings.setupResponsiveResizing();
+                    } else {
+                        // Fallback if settings component not available or not initialized
+                        console.log('Using fallback responsive sizing');
+                        this.setupResponsiveCanvas(defaultWidth, defaultHeight);
+                    }
+                }
+
+                // Enable multi-selection via Shift or Ctrl key
                 canvas.on('mouse:down', function (options) {
-                    const isCtrlKey = options.e.ctrlKey || options.e.metaKey; // Ctrl on Windows/Linux, Cmd on Mac
+                    const isCtrlKey = options.e.ctrlKey || options.e.metaKey;
                     const isShiftKey = options.e.shiftKey;
 
-                    // Allow multi-selection when Shift or Ctrl (Cmd) is pressed
                     if (isCtrlKey || isShiftKey) {
                         canvas.isSelection = true;
                     }
                 });
 
-                // Add proper resize handling to maintain aspect ratio or default size
-                window.addEventListener('resize', () => {
-                    const newWidth = Math.min(defaultWidth, canvasContainer.clientWidth);
-                    const newHeight = Math.min(defaultHeight, canvasContainer.clientHeight);
-
-                    // Update canvas dimensions, maintaining 1080p or resizing to container's available space
-                    canvas.setDimensions({
-                        width: newWidth,
-                        height: newHeight
-                    });
-
-                    // Re-center all objects
-                    const objects = canvas.getObjects();
-                    if (objects.length > 0) {
-                        try {
-                            // Create a temporary active selection with all objects
-                            const selection = new fabric.ActiveSelection(objects, {canvas: canvas});
-                            
-                            // Get current center of the selection
-                            const selectionCenter = selection.getCenterPoint();
-                            
-                            // Get the new canvas center
-                            const canvasCenter = { x: newWidth / 2, y: newHeight / 2 };
-                            
-                            // Calculate the offset needed to center
-                            const offsetX = canvasCenter.x - selectionCenter.x;
-                            const offsetY = canvasCenter.y - selectionCenter.y;
-                            
-                            // Move the selection to center
-                            selection.left += offsetX;
-                            selection.top += offsetY;
-                            selection.setCoords();
-                            
-                            // Apply the changes to the canvas
-                            canvas.setActiveObject(selection);
-                            canvas.discardActiveObject();
-                            canvas.requestRenderAll();
-                        } catch (error) {
-                            console.error("Error centering objects on resize:", error);
-                        }
-                    }
-                });
-
-                // Make wheel event passive for better performance
-                if (canvas.wrapperEl) {
-                    const originalAddEventListener = canvas.wrapperEl.addEventListener;
-                    canvas.wrapperEl.addEventListener = function (type, listener, options) {
-                        if (type === "wheel") {
-                            if (typeof options === "object") {
-                                options.passive = true;
-                            } else {
-                                options = {passive: true};
-                            }
-                        }
-                        return originalAddEventListener.call(this, type, listener, options);
-                    };
-                }
-
-                // Set up native Fabric event listeners with proper context binding
+                // Set up event listeners
                 canvas.on("selection:created", (e) => this.handleSelection(e));
                 canvas.on("selection:updated", (e) => this.handleSelection(e));
                 canvas.on("selection:cleared", () => this.handleSelectionCleared());
@@ -777,25 +792,82 @@ export default function fabricComponent() {
                     canvas.requestRenderAll();
                 }, 100);
 
-                // Replace the toolbar object in your initCanvas function with this implementation
-
+                // Initialize the toolbar
                 this.toolbar = toolbarComponent();
-
-// Initialize the toolbar
                 if (this.toolbar && typeof this.toolbar.init === 'function') {
                     this.toolbar.init();
                 }
+
+                console.log("Canvas initialized successfully");
 
             } catch (error) {
                 console.error("Error initializing canvas:", error);
             }
         },
 
+// Add a fallback responsive canvas setup if settings component is not available
+        setupResponsiveCanvas(width, height) {
+            if (!window.canvas) return;
+
+            const canvasContainer = document.getElementById('canvas-container');
+            if (!canvasContainer) return;
+
+            // Store the export dimensions
+            this.exportWidth = width;
+            this.exportHeight = height;
+
+            // Calculate aspect ratio
+            const ar = width / height;
+
+            // Implement the manager's resize approach
+            const resizeCanvas = () => {
+                // Get container dimensions
+                const windowWidth = canvasContainer.clientWidth;
+                const windowHeight = canvasContainer.clientHeight;
+
+                // Calculate new dimensions using manager's formula
+                let newWidth = windowWidth / 1.5;
+                let newHeight = newWidth / ar;
+
+                if (newHeight > windowHeight) {
+                    newHeight = windowHeight / 1.5;
+                    newWidth = newHeight * ar;
+                }
+
+                // Apply dimensions
+                window.canvas.setDimensions({
+                    width: newWidth,
+                    height: newHeight
+                });
+
+                // Also update CSS dimensions
+                window.canvas.setDimensions({
+                    width: newWidth + 'px',
+                    height: newHeight + 'px'
+                }, { cssOnly: true });
+
+                window.canvas.renderAll();
+
+                console.log(`Canvas resized to: ${newWidth.toFixed(0)}x${newHeight.toFixed(0)}`);
+            };
+
+            // Add resize event listener with debounce
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(resizeCanvas, 250);
+            });
+
+            // Initial call
+            console.log('Initial canvas sizing with fallback method');
+            resizeCanvas();
+        },
+        
         handleSelection(e) {
             try {
                 const activeObject = this.canvas.getActiveObject();
                 if (activeObject) {
-                    
+
 
                     // Update specific component states
                     if (this.toolbar) {
@@ -1035,16 +1107,19 @@ export default function fabricComponent() {
             }
         },
 
-        //  keyboard shortcuts
+        // Keyboard shortcuts
         initKeyboardShortcuts() {
-            // Add event listener for keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
+            // Remove any existing global event handlers to avoid duplicates
+            document.removeEventListener('keydown', this.handleKeyDown);
+
+            // Add a single, comprehensive keyboard shortcut handler
+            document.addEventListener('keydown', this.handleKeyDown = (e) => {
                 // Skip if we're in an input field or textarea
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return;
                 }
 
-                // Skip if any modifier keys are pressed except for the ones we explicitly check for
+                // Skip if alt key is pressed (usually browser shortcuts)
                 if (e.altKey) {
                     return;
                 }
@@ -1052,15 +1127,53 @@ export default function fabricComponent() {
                 // Get active canvas object
                 const activeObject = window.canvas?.getActiveObject();
 
-                // Delete / Backspace key
+                // Undo: Ctrl+Z (Windows/Linux) or Command+Z (Mac)
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault(); // Important to prevent browser's default undo
+                    console.log('Undo triggered via keyboard');
+                    undoHistory(); // Call the imported function
+                    return;
+                }
+
+                // Redo: Ctrl+Shift+Z or Ctrl+Y (Windows/Linux) or Command+Shift+Z or Command+Y (Mac)
+                if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+                    ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+                    e.preventDefault(); // Important to prevent browser's default redo
+                    console.log('Redo triggered via keyboard');
+                    redoHistory(); // Call the imported function
+                    return;
+                }
+
+                // Delete / Backspace key - FIXED CASE SENSITIVITY
                 if ((e.key === 'Delete' || e.key === 'Backspace') && activeObject) {
                     e.preventDefault();
-                    this.deleteObject();
-                    window.canvas.requestRenderAll();
+
+                    // If multiple objects are selected (check case-insensitive)
+                    if (activeObject.type && activeObject.type.toLowerCase() === 'activeselection') {
+                        // Get all objects in the selection
+                        const objects = activeObject.getObjects();
+
+                        // Remove the active selection first
+                        window.canvas.discardActiveObject();
+
+                        // Remove each object from the canvas
+                        objects.forEach(obj => {
+                            window.canvas.remove(obj);
+                        });
+
+                        window.canvas.requestRenderAll();
+                        this.addToHistory();
+
+                        console.log(`Deleted ${objects.length} objects with backspace/delete key`);
+                    } else {
+                        // Single object deletion
+                        this.deleteObject();
+                        window.canvas.requestRenderAll();
+                    }
                 }
 
                 // Ctrl+C (Copy)
-                if (e.ctrlKey && e.key === 'c' && activeObject) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'c' && activeObject) {
                     e.preventDefault();
                     // Store object data as JSON
                     window._clipboard = {
@@ -1070,7 +1183,7 @@ export default function fabricComponent() {
                 }
 
                 // Ctrl+X (Cut)
-                if (e.ctrlKey && e.key === 'x' && activeObject) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'x' && activeObject) {
                     e.preventDefault();
                     // Store object data as JSON
                     window._clipboard = {
@@ -1082,7 +1195,7 @@ export default function fabricComponent() {
                 }
 
                 // Ctrl+V (Paste)
-                if (e.ctrlKey && e.key === 'v' && window._clipboard) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'v' && window._clipboard) {
                     e.preventDefault();
 
                     // Handle different object types appropriately
@@ -1118,8 +1231,7 @@ export default function fabricComponent() {
                         if (this.text && typeof this.text.textAdded === 'function') {
                             this.text.textAdded(newTextbox);
                         }
-                    }
-                    else if (window._clipboard.type === 'image') {
+                    } else if (window._clipboard.type === 'image') {
                         // Special handling for images - recreate from source instead of cloning
                         const imgData = window._clipboard.json;
 
@@ -1203,8 +1315,7 @@ export default function fabricComponent() {
                                 }
                             }, {crossOrigin: 'anonymous'});
                         }
-                    }
-                    else {
+                    } else {
                         // For other objects, use the standard fabric util to recreate from JSON
                         // This avoids using the problematic clone method
                         window.fabric.util.enlivenObjects([window._clipboard.json], (objects) => {
@@ -1231,7 +1342,7 @@ export default function fabricComponent() {
 
         // Override the centerAll method in your fabricComponent.js file
         centerAll() {
-            
+
             if (!window.canvas) return;
             const objects = window.canvas.getObjects();
             if (objects.length === 0) return;

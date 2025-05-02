@@ -17,26 +17,8 @@ export function initHistoryManager() {
   // Save initial state
   addToHistory();
 
-  // We don't need to add listeners here since we're using manual history management
-  // The components will call addToHistory when needed
-
-  // Setup keyboard shortcuts
-  document.addEventListener("keydown", (e) => {
-    // Undo: Ctrl+Z
-    if (e.ctrlKey && e.key === "z") {
-      e.preventDefault();
-      undo();
-    }
-
-    // Redo: Ctrl+Y or Ctrl+Shift+Z
-    if (
-        (e.ctrlKey && e.key === "y") ||
-        (e.ctrlKey && e.shiftKey && e.key === "z")
-    ) {
-      e.preventDefault();
-      redo();
-    }
-  });
+  // Set up event listeners on the canvas to automatically add history states
+  setupCanvasEventListeners();
 
   // Expose functions globally if needed
   window.historyManager = {
@@ -44,9 +26,47 @@ export function initHistoryManager() {
     redo,
     addToHistory,
   };
+
+  console.log("History manager initialized successfully");
 }
 
-// Function to add current state to history
+// Set up canvas event listeners to automatically track history
+function setupCanvasEventListeners() {
+  if (!window.canvas) return;
+
+  // Primary events that should trigger history updates
+  const historyEvents = [
+    'object:modified',  // When an object is modified (moved, resized, etc.)
+    'object:added',     // When a new object is added to the canvas
+    'object:removed',   // When an object is removed from the canvas
+    'path:created'      // When a drawing path is completed
+  ];
+
+  // Remove any existing event listeners first to avoid duplicates
+  historyEvents.forEach(eventName => {
+    window.canvas.off(eventName, handleHistoryEvent);
+  });
+
+  // Add event listeners for all history events
+  historyEvents.forEach(eventName => {
+    window.canvas.on(eventName, handleHistoryEvent);
+  });
+}
+
+// Event handler for canvas events that should trigger history updates
+function handleHistoryEvent(e) {
+  // Don't add history state if we're in the middle of applying history
+  if (_applyingHistory) return;
+
+  // Debounce history changes to prevent too many states from being saved
+  if (window._historySaveTimeout) clearTimeout(window._historySaveTimeout);
+  window._historySaveTimeout = setTimeout(() => {
+    addToHistory();
+    window._historySaveTimeout = null;
+  }, 300);
+}
+
+// Function to add current state to history (can still be called manually if needed)
 export function addToHistory() {
   if (!window.canvas) return;
 
@@ -60,10 +80,10 @@ export function addToHistory() {
   }
 
   try {
-    // Create a special saveState that handles shadow objects properly
+    // Save the current canvas state
     const saveState = () => {
       try {
-        // Get JSON representation of canvas with reviver function to handle shadows
+        // Get JSON representation of canvas
         const json = window.canvas.toJSON(['shadow']);
 
         // Remove any states beyond current index
@@ -81,6 +101,7 @@ export function addToHistory() {
           historyIndex++;
         }
 
+        console.log(`History state saved (${historyIndex}/${historyStack.length - 1})`);
         return true;
       } catch (err) {
         console.warn("Could not save canvas state:", err);
@@ -88,21 +109,23 @@ export function addToHistory() {
       }
     };
 
-    // Throttle/debounce the save state to avoid saving too many states
-    if (window._historySaveTimeout) clearTimeout(window._historySaveTimeout);
-    window._historySaveTimeout = setTimeout(() => {
-      saveState();
-      window._historySaveTimeout = null;
-    }, 300);
+    saveState();
   } catch (error) {
     console.error("Error saving canvas state:", error);
   }
 }
 
+
 // Function to undo last action
 export function undo() {
-  if (historyIndex <= 0) return;
+  console.log(`Undo requested: current index ${historyIndex}, stack size ${historyStack.length}`);
+  if (historyIndex <= 0) {
+    console.log("Cannot undo: at beginning of history");
+    return;
+  }
+
   historyIndex--;
+  console.log(`Undoing to state ${historyIndex}`);
   applyCanvasState(historyStack[historyIndex]);
 
   // Dispatch event that history has changed (for UI updates)
@@ -113,8 +136,14 @@ export function undo() {
 
 // Function to redo previously undone action
 export function redo() {
-  if (historyIndex >= historyStack.length - 1) return;
+  console.log(`Redo requested: current index ${historyIndex}, stack size ${historyStack.length}`);
+  if (historyIndex >= historyStack.length - 1) {
+    console.log("Cannot redo: at end of history");
+    return;
+  }
+
   historyIndex++;
+  console.log(`Redoing to state ${historyIndex}`);
   applyCanvasState(historyStack[historyIndex]);
 
   // Dispatch event that history has changed (for UI updates)
@@ -129,16 +158,22 @@ export function ignoreNextHistoryChange() {
 }
 
 // Function to apply a saved canvas state
+// Update the applyCanvasState function in history-manager.js
 export function applyCanvasState(state) {
   if (!window.canvas) return;
 
   try {
     _applyingHistory = true;
+    console.log("Applying canvas state");
+
+    // Store the current zoom and panning state if needed
+    const currentZoom = window.canvas.getZoom();
+    const currentViewportTransform = [...window.canvas.viewportTransform];
 
     // Clear current canvas
     window.canvas.clear();
 
-    // Load from JSON with special handling for shadows
+    // Load from JSON with error handling for unknown object types
     window.canvas.loadFromJSON(state, () => {
       // Ensure all objects are properly rendered
       window.canvas.getObjects().forEach(obj => {
@@ -164,7 +199,16 @@ export function applyCanvasState(state) {
         }
       });
 
-      window.canvas.renderAll();
+      // Restore zoom and panning if needed
+      if (currentZoom !== 1) {
+        window.canvas.setZoom(currentZoom);
+      }
+      if (currentViewportTransform) {
+        window.canvas.setViewportTransform(currentViewportTransform);
+      }
+
+      // Force a complete render
+      window.canvas.requestRenderAll();
 
       // Dispatch an event that objects have changed
       window.dispatchEvent(new CustomEvent('objects:changed'));
@@ -172,7 +216,28 @@ export function applyCanvasState(state) {
       // Small delay before turning off applying flag to avoid race conditions
       setTimeout(() => {
         _applyingHistory = false;
+        console.log("Canvas state applied successfully");
       }, 50);
+    }, (err, obj) => {
+      // This is a custom reviver that runs when an object can't be properly deserialized
+      console.warn(`Error loading object of type ${obj.type}:`, err);
+
+      // For curved-text objects, convert them to regular textbox objects
+      if (obj.type === 'curved-text') {
+        return new window.fabric.Textbox(obj.text || '', {
+          left: obj.left || 0,
+          top: obj.top || 0,
+          width: obj.width || 200,
+          fontSize: obj.fontSize || 20,
+          fontFamily: obj.fontFamily || 'Arial',
+          fill: obj.fill || '#000000',
+          textAlign: obj.textAlign || 'left',
+          // Other properties you want to preserve
+        });
+      }
+
+      // Return null for other unknown object types
+      return null;
     });
   } catch (error) {
     console.error("Error applying canvas state:", error);

@@ -34,13 +34,6 @@
     --content-color: #262626;
 }
 
-/* Canvas specific styles that can't be done with Tailwind */
-#image-editor {
-    -webkit-user-drag: element;
-    aspect-ratio: auto 1257 / 798;
-    width: 1005.75px;
-    height: 639px;
-}
 
 
  .bg-checkerboard {
@@ -67,4 +60,51 @@
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #ebebeb;
+    border-radius: 4px;
+    position: relative;
+}
+
+/* Custom Thumb Styling */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #37495d;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+    transition: background 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #37495d;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+    transition: background 0.2s ease;
+}
+
+/* Thumb Hover Effect */
+input[type="range"]:hover::-webkit-slider-thumb {
+    background: #5f6c7d; /* Lighter color when hovered */
+}
+
+input[type="range"]:hover::-moz-range-thumb {
+    background: #5f6c7d; /* Lighter color when hovered */
+}
+
+/* Active range track color */
+input[type="range"]:active {
+    background: #d1d5db; /* Darker gray when the range is active */
 }
