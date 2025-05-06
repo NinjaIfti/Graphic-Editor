@@ -48,6 +48,28 @@ export default function textComponent() {
                     console.log("Text component connected to canvas manager");
                 }
             });
+            
+            // Listen for history selection restored events
+            window.addEventListener('history:selection:restored', (e) => {
+                if (e.detail && e.detail.type === 'text' && e.detail.object) {
+                    console.log("Text selection restored from history operation");
+                    this.handleTextSelected(e.detail.object);
+                }
+            });
+            
+            // Also listen for general history operations
+            window.addEventListener('history:operation:end', (e) => {
+                if (e.detail && e.detail.operation) {
+                    // Check if we have a selected text object after any history operation
+                    if (window.canvas && window.canvas.getActiveObject()) {
+                        const obj = window.canvas.getActiveObject();
+                        if (obj && obj.type && obj.type.includes('text')) {
+                            console.log("Text object remains selected after history operation");
+                            this.handleTextSelected(obj);
+                        }
+                    }
+                }
+            });
         },
 
         // Helper color conversion function

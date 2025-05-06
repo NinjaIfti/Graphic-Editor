@@ -1,4 +1,6 @@
 import { EraserBrush } from '@erase2d/fabric';
+import { addToHistory, undo as globalUndo, redo as globalRedo } from '../utils/history-manager';
+
 export default function drawingComponent() {
     return {
         isActive: false,
@@ -29,11 +31,12 @@ export default function drawingComponent() {
         },
 
         pencilDropdownOpen: false,
-
-        // Canvas history settings
-        canvasHistory: [],
-        historyIndex: -1,
-        maxHistorySteps: 20,
+        
+        // Simple operation flags
+        _erasingInProgress: false,
+        _historyOperationInProgress: false,
+        _lastUndoTime: 0, // Track last undo time for throttling
+        _pendingUndo: false, // Track if we have a pending undo operation
 
         init() {
             this.$nextTick(() => {
@@ -42,6 +45,12 @@ export default function drawingComponent() {
                     if (this.isActive) {
                         this.activateDrawingMode();
                     }
+
+                    // Initial history state
+                    setTimeout(() => {
+                        addToHistory();
+                        console.log("Initial drawing state saved to history");
+                    }, 500);
                 }
             });
 
@@ -71,87 +80,81 @@ export default function drawingComponent() {
                 }
             });
 
-            // Setup canvas history events
-            this.setupCanvasHistory();
+            // Setup canvas events
+            this.setupCanvasEvents();
+            
+            // Listen for history operations
+            document.addEventListener('history:operation:start', () => {
+                this._historyOperationInProgress = true;
+                console.log("History operation started");
+            });
+            
+            document.addEventListener('history:operation:end', () => {
+                setTimeout(() => {
+                    this._historyOperationInProgress = false;
+                    console.log("History operation ended");
+                    
+                    // Reactivate drawing mode if needed
+                    if (this.isActive) {
+                        this.updateDrawingMode(this.activeTab);
+                    }
+                }, 50);
+            });
+            
+            // Make this component accessible to the window for debugging
+            window.drawingComponent = this;
         },
 
-        // Setup canvas history tracking
-        setupCanvasHistory() {
+        // Set up canvas events for drawing operations
+        setupCanvasEvents() {
             if (!window.canvas) return;
 
-            // Save initial state
-            this.saveCanvasState();
+            // Clean up any existing event handlers
+            window.canvas.off("path:created");
+            window.canvas.off("object:added");
+            window.canvas.off("erasing:start");
+            window.canvas.off("erasing:end");
 
-            // Add event listener for object modifications
-            window.canvas.on("object:added", () => this.saveCanvasState());
-            window.canvas.on("object:modified", () => this.saveCanvasState());
-            window.canvas.on("object:removed", () => this.saveCanvasState());
-        },
-
-        // Save current canvas state
-        saveCanvasState() {
-            if (!window.canvas) return;
-
-            if (this._applyingHistory) return;
-
-            try {
-                // Get JSON representation of canvas
-                const json = window.canvas.toJSON();
-
-                if (this.historyIndex < this.canvasHistory.length - 1) {
-                    this.canvasHistory = this.canvasHistory.slice(0, this.historyIndex + 1);
+            // Handle path creation (drawing) - simple event tracking
+            window.canvas.on("path:created", () => {
+                // Don't save if this is part of an eraser operation or history operation
+                if (this._erasingInProgress || this._historyOperationInProgress) {
+                    return;
                 }
+                
+                console.log("Path created, saving to history");
+                // Simple delay to allow canvas to update
+                setTimeout(() => {
+                    addToHistory();
+                }, 50);
+            });
 
-                this.canvasHistory.push(json);
+            // Track eraser operations
+            window.canvas.on("erasing:start", () => {
+                if (this._historyOperationInProgress) return;
+                
+                this._erasingInProgress = true;
+                
+                // Save state before erasing
+                console.log("Eraser operation started, saving pre-erase state");
+                addToHistory();
+            });
 
-                if (this.canvasHistory.length > this.maxHistorySteps) {
-                    this.canvasHistory.shift();
-                } else {
-                    this.historyIndex++;
-                }
-            } catch (error) {
-                console.error("Error saving canvas state:", error);
-            }
+            window.canvas.on("erasing:end", () => {
+                if (this._historyOperationInProgress) return;
+                
+                // Add erased state to history after a brief delay
+                setTimeout(() => {
+                    if (this._erasingInProgress) {
+                        this._erasingInProgress = false;
+                        console.log("Eraser operation ended, saving post-erase state");
+                        addToHistory();
+                    }
+                }, 100);
+            });
         },
 
-        // Undo last action
-        undo() {
-            if (this.historyIndex <= 0) return;
-            this.historyIndex--;
-            this.applyCanvasState(this.canvasHistory[this.historyIndex]);
-        },
-
-        // Redo last undone action
-        redo() {
-            if (this.historyIndex >= this.canvasHistory.length - 1) return;
-            this.historyIndex++;
-            this.applyCanvasState(this.canvasHistory[this.historyIndex]);
-        },
-
-        // Apply a saved canvas state
-        applyCanvasState(state) {
-            if (!window.canvas) return;
-
-            try {
-                this._applyingHistory = true;
-                window.canvas.loadFromJSON(state, () => {
-                    window.canvas.renderAll();
-                    this._applyingHistory = false;
-                });
-            } catch (error) {
-                console.error("Error applying canvas state:", error);
-                this._applyingHistory = false;
-            }
-        },
-
-        // Update brush preview (UI only)
-        updateBrushPreview() {
-            if (this.isActive) {
-                this.updateDrawingMode(this.activeTab);
-            }
-        },
-
-        // Activate drawing mode on the canvas
+        // Activate drawing mode
         activateDrawingMode() {
             if (!window.canvas) {
                 console.error("Canvas not found!");
@@ -169,10 +172,13 @@ export default function drawingComponent() {
                 return;
             }
 
+            // Deactivate current mode
             this.deactivateDrawingMode();
-
+            
+            // Update active tab
             this.activeTab = tabName;
 
+            // Set up the requested tool
             switch (tabName) {
                 case 'brush':
                     this.setupBrush();
@@ -186,7 +192,7 @@ export default function drawingComponent() {
             }
         },
 
-        // Setup brush drawing
+        // Set up brush
         setupBrush() {
             if (!window.canvas) return;
 
@@ -205,6 +211,9 @@ export default function drawingComponent() {
                     brush.color = this.brushSettings.color;
                 }
 
+                // Reset flags
+                this._erasingInProgress = false;
+
                 window.canvas.freeDrawingBrush = brush;
                 window.canvas.isDrawingMode = true;
             } catch (error) {
@@ -212,14 +221,16 @@ export default function drawingComponent() {
             }
         },
 
-
+        // Set up eraser
         setupEraser() {
             if (!window.canvas) return;
 
             try {
-                // Set erasable property based on object type
+                // Reset flags
+                this._erasingInProgress = false;
+
+                // Make all path objects erasable
                 window.canvas.forEachObject(function(obj) {
-                    // Only make paths erasable, not text or images
                     if (obj.type === 'path') {
                         obj.set('erasable', true);
                     } else {
@@ -228,49 +239,49 @@ export default function drawingComponent() {
                 });
                 window.canvas.requestRenderAll();
 
-                // Create an instance of EraserBrush
+                // Create eraser brush
                 const eraserBrush = new EraserBrush(window.canvas);
-
-                // Set brush size
                 eraserBrush.width = parseInt(this.eraserSettings.size);
-
-                // Set inverted mode if needed
                 eraserBrush.inverted = this.eraserSettings.invert;
 
-                // Listen for the end event to commit changes
+                // Handle eraser commit
                 eraserBrush.on('end', async (e) => {
+                    if (!e.detail) return;
+                    
                     const { path, targets } = e.detail;
-                    await eraserBrush.commit({ path, targets });
-                    window.canvas.requestRenderAll();
+                    
+                    // Only commit if we have targets
+                    if (targets && targets.length > 0) {
+                        await eraserBrush.commit({ path, targets });
+                        window.canvas.requestRenderAll();
+                        console.log("Erased", targets.length, "objects");
+                    }
                 });
 
                 // Set as active brush
                 window.canvas.freeDrawingBrush = eraserBrush;
                 window.canvas.isDrawingMode = true;
             } catch (error) {
-                console.error("Error setting up eraser brush:", error);
-
-                // Fallback implementation if needed
+                console.error("Error setting up eraser:", error);
             }
         },
 
-        // Clean up when switching tools
+        // Deactivate drawing mode
         deactivateDrawingMode() {
             if (!window.canvas) return;
-
+            
             window.canvas.isDrawingMode = false;
-
-            // If the current brush is our eraser, reset it
-            if (window.canvas.freeDrawingBrush && window.canvas.freeDrawingBrush.type === "eraser") {
-                // Nothing special needed here since we're modifying the instance, not the prototype
-            }
+            this._erasingInProgress = false;
         },
 
-        // Setup pencil with different brush types
+        // Set up pencil with different brush types
         setupPencil() {
             if (!window.canvas) return;
 
             try {
+                // Reset flags
+                this._erasingInProgress = false;
+                
                 let brush;
                 const brushType = this.pencilSettings.brushType;
                 const size = parseInt(this.pencilSettings.size);
@@ -346,34 +357,102 @@ export default function drawingComponent() {
             }
         },
 
-        // Update brush opacity (fix for the missing function issue)
-        updateBrushOpacity(opacity) {
-            if (this.activeTab === 'brush') {
-                this.brushSettings.opacity = parseFloat(opacity);
-                this.setupBrush();
+        // Use global undo function with throttling
+        undo() {
+            const now = Date.now();
+            
+            // If an operation is already in progress or we're throttling, queue it
+            if (this._historyOperationInProgress || (now - this._lastUndoTime < 300)) {
+                if (!this._pendingUndo) {
+                    console.log("Throttling undo operation");
+                    this._pendingUndo = true;
+                    
+                    // Try again after a delay
+                    setTimeout(() => {
+                        this._pendingUndo = false;
+                        this.undo();
+                    }, 350);
+                }
+                return;
             }
+            
+            // Update timestamp and flag
+            this._lastUndoTime = now;
+            this._historyOperationInProgress = true;
+            console.log("Drawing undo requested");
+            
+            try {
+                globalUndo();
+            } catch (err) {
+                console.error("Error during undo:", err);
+            }
+            
+            // Clear operation flag after a delay
+            setTimeout(() => {
+                this._historyOperationInProgress = false;
+            }, 300);
         },
 
-        // Update brush size
+        // Use global redo function with throttling
+        redo() {
+            const now = Date.now();
+            
+            // If an operation is already in progress or we're throttling, ignore
+            if (this._historyOperationInProgress || (now - this._lastUndoTime < 300)) {
+                if (!this._pendingUndo) {
+                    console.log("Throttling redo operation");
+                    this._pendingUndo = true;
+                    
+                    // Try again after a delay
+                    setTimeout(() => {
+                        this._pendingUndo = false;
+                        this.redo();
+                    }, 350);
+                }
+                return;
+            }
+            
+            // Update timestamp and flag
+            this._lastUndoTime = now;
+            this._historyOperationInProgress = true;
+            console.log("Drawing redo requested");
+            
+            try {
+                globalRedo();
+            } catch (err) {
+                console.error("Error during redo:", err);
+            }
+            
+            // Clear operation flag after a delay
+            setTimeout(() => {
+                this._historyOperationInProgress = false;
+            }, 300);
+        },
+
+        // Brush utilities
+        updateBrushOpacity(opacity) {
+            this.brushSettings.opacity = opacity;
+            this.setupBrush();
+        },
+
         updateBrushSize(size) {
             if (this.activeTab === 'brush') {
-                this.brushSettings.size = parseInt(size);
-                this.setupBrush();
+                this.brushSettings.size = size;
+            } else if (this.activeTab === 'eraser') {
+                this.eraserSettings.size = size;
             } else if (this.activeTab === 'pencil') {
-                this.pencilSettings.size = parseInt(size);
-                this.setupPencil();
+                this.pencilSettings.size = size;
             }
+            this.updateDrawingMode(this.activeTab);
         },
 
-        // Update brush color
         updateBrushColor(color) {
             if (this.activeTab === 'brush') {
                 this.brushSettings.color = color;
-                this.setupBrush();
             } else if (this.activeTab === 'pencil') {
                 this.pencilSettings.color = color;
-                this.setupPencil();
             }
+            this.updateDrawingMode(this.activeTab);
         },
 
         // Toggle pencil dropdown
@@ -384,9 +463,8 @@ export default function drawingComponent() {
         // Change pencil type
         changePencilType(type) {
             this.pencilSettings.brushType = type;
-            if (this.activeTab === 'pencil') {
-                this.setupPencil();
-            }
-        },
+            this.setupPencil();
+            this.pencilDropdownOpen = false;
+        }
     };
 }

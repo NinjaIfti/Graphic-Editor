@@ -24,9 +24,17 @@ import {
     initHistoryManager,
     addToHistory as addHistoryState,
     undo as undoHistory,
-    redo as redoHistory
+    redo as redoHistory,
+    filterApplied
 } from "./utils/history-manager";
-// Create the unified fabric component
+
+
+/**
+ * Main fabric.js component
+ * 
+ * This component integrates with history-manager.js for undo/redo operations.
+ * All state management for undo/redo is centralized in history-manager.js.
+ */
 export default function fabricComponent() {
 
     return {
@@ -434,71 +442,80 @@ export default function fabricComponent() {
             }
         },
 
-        // History management
-        historyStack: [],
-        historyPosition: -1,
-        maxHistorySteps: 50,
-
-        initHistoryManager() {
-            this.historyStack = [];
-            this.historyPosition = -1;
-            this.saveCanvasState();
-        },
-
-        saveCanvasState() {
-            if (!window.canvas) return;
-            const json = window.canvas.toJSON([
-                "lockMovementX",
-                "lockMovementY",
-                "lockRotation",
-                "lockScalingX",
-                "lockScalingY",
-            ]);
-            const canvasState = JSON.stringify(json);
-
-            // If we're not at the end of the stack, remove future states
-            if (this.historyPosition < this.historyStack.length - 1) {
-                this.historyStack = this.historyStack.slice(
-                    0,
-                    this.historyPosition + 1
-                );
-            }
-
-            // Add the new state
-            this.historyStack.push(canvasState);
-
-            // Limit the history size
-            if (this.historyStack.length > this.maxHistorySteps) {
-                this.historyStack.shift();
-            } else {
-                this.historyPosition++;
-            }
-        },
-
+        // History management - Use only the imported history-manager.js functionality
         addToHistory() {
-            addHistoryState();
+            if (!window.canvas) return;
+
+            try {
+                // Ensure all objects on canvas have proper properties before saving state
+                const objects = window.canvas.getObjects();
+                
+                objects.forEach(obj => {
+                    if (obj.type === 'image') {
+                        // Make sure image objects have consistent identification
+                        if (!obj.id) {
+                            obj.id = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                        }
+                        
+                        // Ensure filters and properties are properly backed up
+                        if (obj.filters && obj.filters.length > 0 && !obj._filterBackup) {
+                            obj._filterBackup = {
+                                count: obj.filters.length,
+                                width: obj.width,
+                                height: obj.height,
+                                scaleX: obj.scaleX,
+                                scaleY: obj.scaleY,
+                                left: obj.left,
+                                top: obj.top,
+                                angle: obj.angle || 0,
+                                flipX: obj.flipX || false,
+                                flipY: obj.flipY || false,
+                                src: obj.src || (obj._element && obj._element.src)
+                            };
+                        }
+                    }
+                });
+
+                // Call the imported history manager function
+                addHistoryState();
+                
+            } catch (error) {
+                console.error("Error in addToHistory:", error);
+            }
         },
 
         undo() {
+            // Use only the imported function
             undoHistory();
         },
 
         redo() {
+            // Use only the imported function
             redoHistory();
-        },
-
-        loadCanvasState(state) {
-            if (!window.canvas || !state) return;
-
-            window.canvas.clear();
-            window.canvas.loadFromJSON(JSON.parse(state), () => {
-                window.canvas.requestRenderAll();
-            });
         },
 
         exportFunctions: {
             downloadCanvas(format) {
                 if (!window.canvas) return;
+
+                // Make sure export dimensions are correctly set before download
+                // Use window.fabricComponent directly for more reliable access
+                if (window.fabricComponent && window.fabricComponent.settings && 
+                    typeof window.fabricComponent.settings.exportWidth === 'number') {
+                    console.log(`Export dimensions from settings: ${window.fabricComponent.settings.exportWidth}x${window.fabricComponent.settings.exportHeight}`);
+                } else if (window.fabricComponent && 
+                          typeof window.fabricComponent.exportWidth === 'number') {
+                    console.log(`Using fabric component export dimensions: ${window.fabricComponent.exportWidth}x${window.fabricComponent.exportHeight}`);
+                } else {
+                    // If no dimensions are set, use current canvas dimensions
+                    if (window.fabricComponent) {
+                        window.fabricComponent.exportWidth = window.canvas.width;
+                        window.fabricComponent.exportHeight = window.canvas.height;
+                        console.log(`Using current canvas dimensions: ${window.fabricComponent.exportWidth}x${window.fabricComponent.exportHeight}`);
+                    } else {
+                        console.warn("Warning: fabricComponent not available, export may use default dimensions");
+                    }
+                }
 
                 if (format === "png") {
                     downloadPNG();
@@ -514,48 +531,127 @@ export default function fabricComponent() {
                 // Initialize the canvas first - this creates window.canvas
                 this.initCanvas();
 
-                // Initialize the history manager
+                // Store reference to this component globally to access export dimensions
+                window.fabricComponent = this;
+
+                // Initialize settings component if available
+                if (this.settings && typeof this.settings.init === 'function') {
+                    this.settings.init();
+                }
+
+                // Set up initial export dimensions
+                if (this.settings && typeof this.settings.exportWidth === 'number') {
+                    this.exportWidth = this.settings.exportWidth;
+                    this.exportHeight = this.settings.exportHeight;
+                    console.log(`Initial export dimensions set from settings: ${this.exportWidth}x${this.exportHeight}`);
+                }
+
+                // Initialize the history manager - using only the imported implementation
                 initHistoryManager();
+
+                // Add listener to preserve activeTool during history operations
+                window.addEventListener('history:operation:end', (e) => {
+                    // Store current activeTool if it's uploads
+                    if (this.activeTool === 'uploads') {
+                        console.log('Preserving uploads panel after history operation');
+                        
+                        // Use setTimeout to ensure this runs after any other handlers
+                        setTimeout(() => {
+                            this.activeTool = 'uploads';
+                            
+                            // Check if we have an image selected - if not, try to select one
+                            if (this.uploads && window.canvas) {
+                                // If no active image in uploads component, try to find one
+                                if (!this.uploads.selectedImage) {
+                                    console.log('No image selected after history operation, trying to find one');
+                                    
+                                    // First try to get the active object
+                                    const activeObj = window.canvas.getActiveObject();
+                                    if (activeObj && activeObj.type === 'image') {
+                                        // Set as selected object in uploads
+                                        this.uploads.selectedObject = activeObj;
+                                        this.uploads.selectedImage = activeObj;
+                                        if (typeof this.uploads.syncObjectProperties === 'function') {
+                                            this.uploads.syncObjectProperties();
+                                        }
+                                        console.log('Found active image object');
+                                    } else {
+                                        // Look for any image in canvas
+                                        const images = window.canvas.getObjects().filter(obj => obj.type === 'image');
+                                        if (images.length > 0) {
+                                            // Select the first image
+                                            window.canvas.setActiveObject(images[0]);
+                                            this.uploads.selectedObject = images[0];
+                                            this.uploads.selectedImage = images[0];
+                                            if (typeof this.uploads.syncObjectProperties === 'function') {
+                                                this.uploads.syncObjectProperties();
+                                            }
+                                            window.canvas.requestRenderAll();
+                                            console.log('Selected first available image');
+                                        } else {
+                                            console.log('No images available in canvas');
+                                        }
+                                    }
+                                } else {
+                                    // Make sure the selectedImage is still valid
+                                    const validObjects = window.canvas.getObjects();
+                                    const imageStillExists = validObjects.includes(this.uploads.selectedImage);
+                                    
+                                    if (!imageStillExists) {
+                                        console.log('Selected image no longer exists, finding a new one');
+                                        // Try to find a new image to select
+                                        const images = validObjects.filter(obj => obj.type === 'image');
+                                        if (images.length > 0) {
+                                            window.canvas.setActiveObject(images[0]);
+                                            this.uploads.selectedObject = images[0];
+                                            this.uploads.selectedImage = images[0];
+                                            if (typeof this.uploads.syncObjectProperties === 'function') {
+                                                this.uploads.syncObjectProperties();
+                                            }
+                                            window.canvas.requestRenderAll();
+                                            console.log('Selected new image');
+                                        }
+                                    }
+                                }
+                            }
+                        }, 100);
+                    }
+                });
+                
+                // Set the initial canvas size to 1920x1080
+                if (this.settings && typeof this.settings.applyCanvasSize === 'function') {
+                    this.settings.applyCanvasSize('1920x1080');
+                    console.log("Initial canvas size set to 1920x1080");
+                }
 
                 // Set up responsive resizing after canvas initialization
                 if (this.settings && typeof this.settings.setupResponsiveResizing === 'function') {
                     this.settings.setupResponsiveResizing();
                 }
 
-                // Dimension tracking for exports
+                // Continue with the rest of your initialization
                 if (typeof this.initDimensionTracking === 'function') {
                     this.initDimensionTracking();
                 }
 
-                // Set up event listeners only after canvas is initialized
                 this.setupCanvasEventListeners();
-
-                // Initialize keyboard shortcuts for all functions
                 this.initKeyboardShortcuts();
-
-                // Fix for quick options bar alignment
                 this.patchQuickOptionsBarAlignment();
 
-                // Initialize context menu
+                // Initialize components
                 if (this.contextMenu && typeof this.contextMenu.init === 'function') {
                     this.contextMenu.init();
                 }
-
-                // Initialize masks component
                 if (this.masks && typeof this.masks.init === 'function') {
                     this.masks.init();
                 }
-
                 if (this.layers && typeof this.layers.init === 'function') {
                     this.layers.init();
                 }
-
-                // Initialize other components as needed
                 if (this.uploads && typeof this.uploads.init === 'function') {
                     this.uploads.init();
                 }
 
-                // Keep this important log for initialization verification
                 console.log("Canvas initialized:", !!window.canvas);
             });
 
@@ -571,31 +667,76 @@ export default function fabricComponent() {
                 return;
             }
 
-            // Now it's safe to add the event listeners
+            // Handle object addition with standardized property storage
             window.canvas.on('object:added', function(e) {
                 const obj = e.target;
 
-                // Mark all objects as "don't scale me"
-                obj._noScale = true;
+                // Use standardized property storage for all objects
+                if (!obj.id) {
+                    obj.id = `obj_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+                }
 
-                // If it's an image, ensure it's displayed at its natural size
-                if (obj.type === 'image' && !obj._naturalSizeSet) {
+                // Special handling for images
+                if (obj.type === 'image') {
                     const imgElement = obj._element;
-                    if (imgElement) {
-                        // Calculate the scale to show at natural size
-                        const naturalScaleX = imgElement.naturalWidth / obj.width;
-                        const naturalScaleY = imgElement.naturalHeight / obj.height;
+                    
+                    // Store original image source for recovery during undo/redo
+                    if (imgElement && imgElement.src && !obj._originalSrc) {
+                        obj._originalSrc = imgElement.src;
+                    }
+                    
+                    // Ensure natural dimensions are captured
+                    if (imgElement && !obj._naturalWidth) {
+                        obj._naturalWidth = imgElement.naturalWidth;
+                        obj._naturalHeight = imgElement.naturalHeight;
+                    }
+                    
+                    // Create standardized property backup for history operations
+                    if (!obj._filterBackup) {
+                        obj._filterBackup = {
+                            width: obj.width,
+                            height: obj.height,
+                            scaleX: obj.scaleX,
+                            scaleY: obj.scaleY,
+                            left: obj.left,
+                            top: obj.top,
+                            angle: obj.angle || 0,
+                            flipX: obj.flipX || false,
+                            flipY: obj.flipY || false,
+                            originX: obj.originX || 'center',
+                            originY: obj.originY || 'center',
+                            src: obj._originalSrc || (imgElement && imgElement.src)
+                        };
+                    }
+                }
+            });
 
-                        // Apply the natural size scaling
-                        obj.set({
-                            scaleX: naturalScaleX,
-                            scaleY: naturalScaleY,
-                            _naturalSizeSet: true
-                        });
+            // Handle object modifications with consistent property tracking
+            window.canvas.on('object:modified', function(e) {
+                const obj = e.target;
 
-                        // Update coordinates
-                        obj.setCoords();
-                        window.canvas.requestRenderAll();
+                // For images, update the standardized backup
+                if (obj.type === 'image') {
+                    // Update property backup using standard format for history manager
+                    obj._filterBackup = {
+                        width: obj.width,
+                        height: obj.height,
+                        scaleX: obj.scaleX,
+                        scaleY: obj.scaleY,
+                        left: obj.left,
+                        top: obj.top,
+                        angle: obj.angle || 0,
+                        flipX: obj.flipX || false,
+                        flipY: obj.flipY || false,
+                        originX: obj.originX || 'center',
+                        originY: obj.originY || 'center',
+                        filters: obj.filters && obj.filters.length ? [...obj.filters] : [],
+                        src: obj._originalSrc || (obj._element && obj._element.src)
+                    };
+                    
+                    // Make sure we have source URL stored for recovery
+                    if (obj._element && obj._element.src && !obj._originalSrc) {
+                        obj._originalSrc = obj._element.src;
                     }
                 }
             });
@@ -726,9 +867,12 @@ export default function fabricComponent() {
                 const defaultWidth = 1920;
                 const defaultHeight = 1080;
 
-                // Store export dimensions
+                // Store export dimensions - make sure they're available for export functions
                 this.exportWidth = defaultWidth;
                 this.exportHeight = defaultHeight;
+                
+                // Log initial export dimensions
+                console.log(`Initial export dimensions set: ${this.exportWidth}x${this.exportHeight}`);
 
                 // Create canvas with high-resolution for exports
                 const canvas = new fabric.Canvas("image-editor", {
@@ -749,10 +893,28 @@ export default function fabricComponent() {
                 this.canvas = canvas;
                 window.fabricComponent = this;
 
+                // Ensure the fabricComponent has the export dimensions
+                if (!window.fabricComponent.exportWidth) {
+                    window.fabricComponent.exportWidth = defaultWidth;
+                    window.fabricComponent.exportHeight = defaultHeight;
+                }
+
                 // Initialize settings component if not already initialized
                 if (this.settings && typeof this.settings.init === 'function') {
                     // Settings will handle responsive resizing
                     console.log('Settings component will handle responsive sizing');
+                    
+                    // Make sure export dimensions are synced with settings
+                    if (this.settings.exportWidth && this.settings.exportHeight) {
+                        this.exportWidth = this.settings.exportWidth;
+                        this.exportHeight = this.settings.exportHeight;
+                        console.log(`Synced export dimensions from settings: ${this.exportWidth}x${this.exportHeight}`);
+                    } else {
+                        // If settings doesn't have dimensions, set them
+                        this.settings.exportWidth = this.exportWidth;
+                        this.settings.exportHeight = this.exportHeight;
+                        console.log(`Set settings export dimensions: ${this.settings.exportWidth}x${this.settings.exportHeight}`);
+                    }
                 } else {
                     // Use the settings component directly if available, or fallback
                     if (this.settings && typeof this.settings.setupResponsiveResizing === 'function') {
@@ -812,9 +974,23 @@ export default function fabricComponent() {
             const canvasContainer = document.getElementById('canvas-container');
             if (!canvasContainer) return;
 
-            // Store the export dimensions
+            // Store the export dimensions - these are what will be used for PNG/JPG export
             this.exportWidth = width;
             this.exportHeight = height;
+            
+            // Make sure the global fabricComponent also has the export dimensions
+            if (window.fabricComponent) {
+                window.fabricComponent.exportWidth = width;
+                window.fabricComponent.exportHeight = height;
+                
+                // Also ensure the settings component has these dimensions if it exists
+                if (window.fabricComponent.settings) {
+                    window.fabricComponent.settings.exportWidth = width;
+                    window.fabricComponent.settings.exportHeight = height;
+                }
+            }
+            
+            console.log(`Setting up responsive canvas with export dimensions: ${width}x${height}`);
 
             // Calculate aspect ratio
             const ar = width / height;
@@ -834,7 +1010,7 @@ export default function fabricComponent() {
                     newWidth = newHeight * ar;
                 }
 
-                // Apply dimensions
+                // Apply dimensions for DISPLAY only
                 window.canvas.setDimensions({
                     width: newWidth,
                     height: newHeight
@@ -848,7 +1024,7 @@ export default function fabricComponent() {
 
                 window.canvas.renderAll();
 
-                console.log(`Canvas resized to: ${newWidth.toFixed(0)}x${newHeight.toFixed(0)}`);
+                console.log(`Canvas resized to: ${newWidth.toFixed(0)}x${newHeight.toFixed(0)} (export dimensions remain: ${width}x${height})`);
             };
 
             // Add resize event listener with debounce
@@ -969,68 +1145,110 @@ export default function fabricComponent() {
         applyFilter(imageObject, filterType, options) {
             if (!imageObject) return;
 
-            // Clear existing filters
-            imageObject.filters = [];
+            // Store original state for potential recovery
+            const originalFilters = imageObject.filters ? [...imageObject.filters] : [];
+            
+            try {
+                // Clear existing filters
+                imageObject.filters = [];
 
-            // Apply Fabric's built-in filters based on filter type
-            switch (filterType) {
-                case "grayscale":
-                    imageObject.filters.push(new filters.Grayscale());
-                    break;
-                case "sepia":
-                    imageObject.filters.push(new filters.Sepia());
-                    break;
-                case "invert":
-                    imageObject.filters.push(new filters.Invert());
-                    break;
-                case "blur":
-                    imageObject.filters.push(
-                        new filters.Blur({
-                            blur: options?.amount || 0.5,
-                        })
-                    );
-                    break;
-                case "contrast":
-                    imageObject.filters.push(
-                        new filters.Contrast({
-                            contrast: options?.amount || 0.25,
-                        })
-                    );
-                    break;
-                case "brightness":
-                    imageObject.filters.push(
-                        new filters.Brightness({
-                            brightness: options?.amount || 0.1,
-                        })
-                    );
-                    break;
-                case "saturation":
-                    imageObject.filters.push(
-                        new filters.Saturation({
-                            saturation: options?.amount || 0.3,
-                        })
-                    );
-                    break;
-                case "noise":
-                    imageObject.filters.push(
-                        new filters.Noise({
-                            noise: options?.amount || 100,
-                        })
-                    );
-                    break;
-                case "pixelate":
-                    imageObject.filters.push(
-                        new filters.Pixelate({
-                            blocksize: options?.amount || 10,
-                        })
-                    );
-                    break;
+                // Apply Fabric's built-in filters based on filter type
+                switch (filterType) {
+                    case "grayscale":
+                        imageObject.filters.push(new filters.Grayscale());
+                        break;
+                    case "sepia":
+                        imageObject.filters.push(new filters.Sepia());
+                        break;
+                    case "invert":
+                        imageObject.filters.push(new filters.Invert());
+                        break;
+                    case "blur":
+                        imageObject.filters.push(
+                            new filters.Blur({
+                                blur: options?.amount || 0.5,
+                            })
+                        );
+                        break;
+                    case "contrast":
+                        imageObject.filters.push(
+                            new filters.Contrast({
+                                contrast: options?.amount || 0.25,
+                            })
+                        );
+                        break;
+                    case "brightness":
+                        imageObject.filters.push(
+                            new filters.Brightness({
+                                brightness: options?.amount || 0.1,
+                            })
+                        );
+                        break;
+                    case "saturation":
+                        imageObject.filters.push(
+                            new filters.Saturation({
+                                saturation: options?.amount || 0.3,
+                            })
+                        );
+                        break;
+                    case "noise":
+                        imageObject.filters.push(
+                            new filters.Noise({
+                                noise: options?.amount || 100,
+                            })
+                        );
+                        break;
+                    case "pixelate":
+                        imageObject.filters.push(
+                            new filters.Pixelate({
+                                blocksize: options?.amount || 10,
+                            })
+                        );
+                        break;
+                }
+
+                // Make sure we have property backup for history tracking
+                imageObject._filterBackup = {
+                    count: imageObject.filters.length,
+                    width: imageObject.width,
+                    height: imageObject.height,
+                    scaleX: imageObject.scaleX,
+                    scaleY: imageObject.scaleY,
+                    left: imageObject.left,
+                    top: imageObject.top,
+                    angle: imageObject.angle || 0,
+                    flipX: imageObject.flipX || false,
+                    flipY: imageObject.flipY || false,
+                    originX: imageObject.originX || 'center',
+                    originY: imageObject.originY || 'center',
+                    src: imageObject.src || (imageObject._element && imageObject._element.src),
+                    filterType: filterType,
+                    options: options
+                };
+
+                // Apply the filters
+                imageObject.applyFilters();
+                this.canvas.requestRenderAll();
+                
+                // Use the history manager's filterApplied method for proper state tracking
+                if (window.historyManager && typeof window.historyManager.filterApplied === 'function') {
+                    window.historyManager.filterApplied(imageObject);
+                } else {
+                    // Fallback to standard history tracking
+                    this.addToHistory();
+                }
+            } catch (error) {
+                console.error("Error applying filter:", error);
+                
+                // Restore original filters on error
+                imageObject.filters = originalFilters;
+                try {
+                    imageObject.applyFilters();
+                    this.canvas.requestRenderAll();
+                } catch (e) {
+                    console.error("Error restoring filters:", e);
+                }
             }
-
-            // Apply the filters
-            imageObject.applyFilters();
-            this.canvas.requestRenderAll();
-            this.addToHistory();
         },
 
         addImage(url) {
@@ -1127,11 +1345,23 @@ export default function fabricComponent() {
                 // Get active canvas object
                 const activeObject = window.canvas?.getActiveObject();
 
+                // Save uploads panel state before undo/redo
+                const isUploadsActive = this.activeTool === 'uploads';
+                let selectedImage = null;
+                
+                if (isUploadsActive && this.uploads && this.uploads.selectedImage) {
+                    selectedImage = this.uploads.selectedImage;
+                }
+
                 // Undo: Ctrl+Z (Windows/Linux) or Command+Z (Mac)
                 if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
                     e.preventDefault(); // Important to prevent browser's default undo
                     console.log('Undo triggered via keyboard');
-                    undoHistory(); // Call the imported function
+                    
+                    // Call the imported function
+                    undoHistory();
+                    
+                    // No need for additional handling as history-manager.js now handles all aspects
                     return;
                 }
 
@@ -1140,7 +1370,11 @@ export default function fabricComponent() {
                     ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
                     e.preventDefault(); // Important to prevent browser's default redo
                     console.log('Redo triggered via keyboard');
-                    redoHistory(); // Call the imported function
+                    
+                    // Call the imported function
+                    redoHistory();
+                    
+                    // No need for additional handling as history-manager.js now handles all aspects
                     return;
                 }
 

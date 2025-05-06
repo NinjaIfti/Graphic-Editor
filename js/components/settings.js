@@ -29,6 +29,7 @@ export default function settingsComponent() {
             {key: 'custom', name: 'Custom Size', value: 'custom'}
         ],
         filteredSizes: [],
+        originalImageData: {}, // Store original image dimensions
         
         // Initialize settings
         init() {
@@ -53,13 +54,39 @@ export default function settingsComponent() {
             // Add window resize handler
             window.addEventListener('resize', this.handleWindowResize.bind(this));
 
+            // Make settings available globally
+            if (window.fabricComponent) {
+                window.fabricComponent.settings = this;
+            }
+
             console.log('✅ Settings initialized with:', {
                 selectedSize: this.selectedSize,
-                selectedValue: this.selectedValue
+                selectedValue: this.selectedValue,
+                exportWidth: this.exportWidth,
+                exportHeight: this.exportHeight
             });
         },
 
-// Handle window resize
+        // Scan canvas for images to track original dimensions
+        scanExistingImages() {
+            if (!window.canvas) return;
+            
+            const objects = window.canvas.getObjects();
+            const images = objects.filter(obj => obj.type === 'image');
+            
+            images.forEach(img => {
+                const src = img.getSrc();
+                if (src && !this.originalImageData[src]) {
+                    this.originalImageData[src] = {
+                        width: img.width,
+                        height: img.height,
+                        aspectRatio: img.width / img.height
+                    };
+                }
+            });
+        },
+
+        // Handle window resize
         handleWindowResize() {
             // Debounce the resize event to avoid excessive updates
             clearTimeout(this.resizeTimer);
@@ -91,7 +118,7 @@ export default function settingsComponent() {
             const windowHeight = this.$refs.canvasContainer.clientHeight;
             let ar = width / height;
             let newWidth = windowWidth / 1.5;
-            let newHeight = windowWidth / ar;
+            let newHeight = newWidth / ar;
 
             console.log(newWidth, newHeight, windowWidth, windowHeight);
             if (newHeight > windowHeight) {
@@ -140,6 +167,19 @@ export default function settingsComponent() {
             // Update export dimensions for reference
             this.exportWidth = width;
             this.exportHeight = height;
+
+            // Ensure fabricComponent also has the export dimensions - critical for export functionality
+            if (window.fabricComponent) {
+                window.fabricComponent.exportWidth = width;
+                window.fabricComponent.exportHeight = height;
+                
+                // Explicitly make settings available globally to ensure export functions can access it
+                window.fabricComponent.settings = this;
+                
+                console.log(`📊 Updated fabricComponent export dimensions: ${width}x${height}`);
+            } else {
+                console.warn('⚠️ fabricComponent not found for dimension update');
+            }
 
             // Calculate viewport constraints
             const viewportWidth = window.innerWidth * 0.8;  // 80% of viewport width
@@ -196,6 +236,7 @@ export default function settingsComponent() {
 
             console.log(`📏 Canvas size set to ${width}x${height} with zoom: ${zoom.toFixed(2)}`);
             console.log(`📏 Container size set to ${containerWidth.toFixed(0)}x${containerHeight.toFixed(0)}`);
+            console.log(`📏 Export dimensions set to ${this.exportWidth}x${this.exportHeight}`);
 
             // Add to history if available
             if (window.fabricComponent && typeof window.fabricComponent.addToHistory === 'function') {
